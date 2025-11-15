@@ -3,12 +3,13 @@ from __future__ import annotations
 
 import argparse
 from datetime import UTC, datetime, timedelta
+import shlex
 import subprocess
 import sys
 import textwrap
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from .utils import (
     Config,
@@ -23,6 +24,31 @@ from .utils import (
 
 class RunnerError(Exception):
     """Raised when the run needs to abort early."""
+
+
+class TimeoutBudget:
+    """Track elapsed time between iterations and flag overages."""
+
+    def __init__(
+        self,
+        seconds: int,
+        *,
+        monotonic: Callable[[], float] = time.monotonic,
+    ) -> None:
+        self._limit = timedelta(seconds=seconds)
+        self._monotonic = monotonic
+        self._started_at = self._monotonic()
+
+    def reset(self) -> None:
+        """Start a new timeout window."""
+
+        self._started_at = self._monotonic()
+
+    def expired(self) -> bool:
+        """Return True when the timeout window has been exceeded."""
+
+        elapsed = timedelta(seconds=self._monotonic() - self._started_at)
+        return elapsed > self._limit
 
 
 def parse_args() -> argparse.Namespace:
@@ -108,48 +134,72 @@ def build_prompt(cfg: Config, spec_name: str, stats: TaskStats) -> str:
     return cfg.prompt_template.format(**context)
 
 
-def run_codex(cfg: Config, project_path: Path, prompt: str, dry_run: bool) -> str:
-    """Execute the codex command and return captured output."""
-    if dry_run:
-        simulated = f"[dry-run] Would run: {' '.join(cfg.codex_command)} {prompt!r}"
-        print(simulated)
-        return simulated
-
+def run_codex(
+    cfg: Config,
+    project_path: Path,
+    prompt: str,
+    dry_run: bool,
+    *,
+    spec_name: str,
+    iteration: int,
+    log_path: Path,
+) -> None:
+    """Execute the codex command and stream output into a log file."""
+    log_path.parent.mkdir(parents=True, exist_ok=True)
     command = list(cfg.codex_command) + [prompt]
-    print("\nRunning:", " ".join(command))
-    proc = subprocess.run(
-        command,
-        cwd=project_path,
-        capture_output=True,
-        text=True,
-    )
-    output = textwrap.dedent(
-        f"""
+    started = datetime.now(UTC).isoformat()
+    formatted_command = " ".join(shlex.quote(part) for part in command)
+    header = textwrap.dedent(
+        f"""\
+        # Iteration {iteration}
+        # Started {started}
+        # Spec {spec_name}
         # Command
-        {' '.join(command)}
+        {formatted_command}
 
-        # Exit Code
-        {proc.returncode}
+        # Prompt
+        {prompt}
 
-        # STDOUT
-        {proc.stdout.strip()}
-
-        # STDERR
-        {proc.stderr.strip()}
+        # Output (stdout + stderr)
         """
-    ).strip()
-    print(proc.stdout)
+    )
+
+    def _print_and_log(message: str, handle) -> None:
+        print(message, end="")
+        handle.write(message)
+        handle.flush()
+
+    if dry_run:
+        simulated = (
+            f"[dry-run] Would run: {' '.join(cfg.codex_command)} {prompt!r}\n"
+        )
+        with log_path.open("w", encoding="utf-8") as handle:
+            handle.write(header)
+            handle.write(simulated)
+            handle.write("# Exit Code\n0\n")
+        print(simulated.strip())
+        print(f"Saved log: {log_path}")
+        return
+
+    print("\nRunning:", formatted_command)
+    with log_path.open("w", encoding="utf-8") as handle:
+        handle.write(header)
+        proc = subprocess.Popen(
+            command,
+            cwd=project_path,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            bufsize=1,
+        )
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            _print_and_log(line, handle)
+        proc.wait()
+        handle.write(f"\n# Exit Code\n{proc.returncode}\n")
+
     if proc.returncode != 0:
-        print(proc.stderr, file=sys.stderr)
         raise RunnerError("codex command failed. See log for details.")
-    return output
-
-
-def write_log(log_dir: Path, cfg: Config, iteration: int, contents: str) -> None:
-    """Persist the output for later review."""
-    log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / cfg.log_file_template.format(index=iteration)
-    log_path.write_text(contents, encoding="utf-8")
     print(f"Saved log: {log_path}")
 
 
@@ -168,8 +218,7 @@ def run_loop(
     no_commit_streak = 0
     iteration = 0
     log_dir = project_path / cfg.log_dir_name / spec_name
-    start_time = time.monotonic()
-    limit = timedelta(seconds=cfg.timeout_seconds)
+    timeout = TimeoutBudget(cfg.timeout_seconds)
     last_commit = get_current_commit(project_path)
 
     while True:
@@ -182,14 +231,22 @@ def run_loop(
             print("All tasks complete. Nothing more to run.")
             return
 
-        elapsed = timedelta(seconds=time.monotonic() - start_time)
-        if elapsed > limit:
+        if timeout.expired():
             raise RunnerError("Timeout exceeded. Aborting.")
 
         iteration += 1
         prompt = build_prompt(cfg, spec_name, stats)
-        output = run_codex(cfg, project_path, prompt, dry_run)
-        write_log(log_dir, cfg, iteration, output)
+        log_path = log_dir / cfg.log_file_template.format(index=iteration)
+        run_codex(
+            cfg,
+            project_path,
+            prompt,
+            dry_run,
+            spec_name=spec_name,
+            iteration=iteration,
+            log_path=log_path,
+        )
+        timeout.reset()
         if dry_run:
             print("Dry-run mode: skipping commit checks and exiting after first iteration.")
             return
