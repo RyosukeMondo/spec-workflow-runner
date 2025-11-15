@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Virtual environments
+.venv/
+
+# Build artifacts
+dist/
+build/
+*.egg-info/
+
+# Spec workflow logs
+logs/
