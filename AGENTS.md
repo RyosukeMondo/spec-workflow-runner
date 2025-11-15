@@ -30,6 +30,9 @@ pip install -e .[dev]
 
 Aim for ≥80 % coverage overall (≥90 % on critical paths) and keep each PR green locally before relying on CI.
 
+- Always reuse the repo’s `.venv` when present: `source .venv/bin/activate`. Install missing deps via `pip install -e '.[dev]'` (quotes required for extras). Run commands with the virtualenv active (`python -m pytest`, `ruff`, etc.) so they pick up installed tooling.
+- Shells may cache missing executables; after installing new entry points run `hash -r` (bash) or `rehash` (zsh) before calling `spec-workflow-run` / `spec-workflow-monitor`.
+
 ## Workflow Expectations
 - CLIs are the canonical entry points (`spec-workflow-run`, `spec-workflow-monitor`); build/debug new features behind flags before expanding scope.
 - Prefer modern Python 3.11 features (pattern matching, type aliases, `|` unions) where they improve readability.
