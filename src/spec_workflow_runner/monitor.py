@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+from collections import deque
 import time
 from pathlib import Path
 
@@ -10,6 +11,7 @@ from rich.live import Live
 from rich.panel import Panel
 from rich.progress import BarColumn, Progress, TextColumn
 from rich.table import Table
+from rich.text import Text
 
 from .utils import (
     Config,
@@ -62,8 +64,68 @@ def ensure_spec(project: Path, cfg: Config, spec_name: str | None) -> tuple[str,
     )
 
 
-def build_dashboard(project: Path, spec_name: str, stats) -> Panel:
-    """Return a Rich Panel summarizing the current progress."""
+class LogFollower:
+    """Track and stream the tail of the latest log file."""
+
+    def __init__(self, log_dir: Path, pattern: str, max_lines: int = 200) -> None:
+        self.log_dir = log_dir
+        self.pattern = pattern
+        self.max_lines = max_lines
+        self.current_path: Path | None = None
+        self.offset = 0
+        self._lines: deque[str] = deque(maxlen=max_lines)
+
+    @property
+    def lines(self) -> list[str]:
+        """Return the currently buffered lines."""
+        return list(self._lines)
+
+    def poll(self) -> None:
+        """Read newly written data from the log file."""
+        latest = self._latest_path()
+        if latest is None:
+            self.current_path = None
+            self.offset = 0
+            self._lines.clear()
+            return
+        if self.current_path != latest:
+            self.current_path = latest
+            self.offset = 0
+            self._lines.clear()
+        size = latest.stat().st_size
+        if size < self.offset:
+            self.offset = 0
+        if size > self.offset:
+            with latest.open("r", encoding="utf-8") as handle:
+                handle.seek(self.offset)
+                chunk = handle.read()
+                self.offset = handle.tell()
+            for line in chunk.splitlines():
+                self._lines.append(line)
+
+    def render_panel(self) -> Panel:
+        """Return a Rich Panel describing the current log tail."""
+        if not self.current_path:
+            body = Text("Waiting for logs...", style="dim")
+            title = "Logs"
+        else:
+            content = "\n".join(self._lines).strip() or "(log exists but is empty)"
+            body = Text(content, overflow="fold")
+            title = f"Logs – {self.current_path.name}"
+        return Panel(body, border_style="blue", title=title)
+
+    def _latest_path(self) -> Path | None:
+        if not self.log_dir.exists():
+            return None
+        pattern = self.pattern or "*"
+        candidates = list(self.log_dir.glob(pattern))
+        if not candidates:
+            return None
+        return max(candidates, key=lambda path: path.stat().st_mtime)
+
+
+def build_dashboard(project: Path, spec_name: str, stats, log_panel: Panel) -> Group:
+    """Return Rich renderables summarizing the current progress and logs."""
     table = Table.grid(padding=(0, 1))
     table.add_row("[bold]Project[/bold]", str(project))
     table.add_row("[bold]Spec[/bold]", spec_name)
@@ -81,11 +143,12 @@ def build_dashboard(project: Path, spec_name: str, stats) -> Panel:
     task_id = progress.add_task("tasks", total=max(stats.total, 1))
     progress.update(task_id, completed=stats.done)
 
-    return Panel(
+    summary = Panel(
         Group(table, progress),
         title="Spec Workflow Monitor",
         border_style="green" if stats.pending == 0 and stats.in_progress == 0 else "yellow",
     )
+    return Group(summary, log_panel)
 
 
 def monitor(cfg: Config, project: Path, spec_name: str, spec_path: Path) -> None:
@@ -96,11 +159,15 @@ def monitor(cfg: Config, project: Path, spec_name: str, spec_path: Path) -> None
 
     console = Console()
     refresh = cfg.monitor_refresh_seconds
+    log_dir = project / cfg.log_dir_name / spec_name
+    pattern = cfg.log_file_template.replace("{index}", "*") if "{index}" in cfg.log_file_template else "*"
+    follower = LogFollower(log_dir, pattern)
 
     with Live(console=console, refresh_per_second=4) as live:
         while True:
             stats = read_task_stats(tasks_path)
-            live.update(build_dashboard(project, spec_name, stats))
+            follower.poll()
+            live.update(build_dashboard(project, spec_name, stats, follower.render_panel()))
             if stats.pending == 0 and stats.in_progress == 0:
                 console.print("[bold green]All tasks complete![/bold green]")
                 break
