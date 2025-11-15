@@ -1,0 +1,5 @@
+# Project Overview
+- Purpose: Automates the "spec workflow" loop by finding a project/spec inside `.spec-workflow/specs`, building prompts from `tasks.md`, running the configured Codex command, and logging progress; also includes a Rich-based monitor to visualize completion stats.
+- Key modules: `spec_workflow_utils.py` (Config dataclass, filesystem discovery helpers, `read_task_stats`, CLI menu utilities), `spec_workflow_run_tasks.py` (main automation loop, codex invocation, log writer), and `spec_workflow_monitor.py` (terminal dashboard for task status).
+- Config: `config.json` defines repo root, spec directory naming, codex command, timeout/log settings, ignore dirs, and monitor refresh cadence; scripts load it via `Config.from_dict`.
+- Data layout: Specs live under `<project>/.spec-workflow/specs/<spec_name>/tasks.md`; stats are inferred from `[ ]/[x]/[-]` checklist states parsed by `TASK_PATTERN`.
