@@ -22,6 +22,14 @@ from .utils import (
 )
 
 
+class AllSpecsSentinel:
+    """Marker object representing the 'run all specs' selection."""
+
+
+ALL_SPECS_SENTINEL = AllSpecsSentinel()
+SpecOption = tuple[str, Path] | AllSpecsSentinel
+
+
 class RunnerError(Exception):
     """Raised when the run needs to abort early."""
 
@@ -81,6 +89,63 @@ def ensure_spec(project: Path, cfg: Config, spec_name: str | None) -> tuple[str,
         label=lambda pair: pair[0],
     )
     return name, spec_path
+
+
+def _label_option(option: SpecOption) -> str:
+    if isinstance(option, AllSpecsSentinel):
+        return "All unfinished specs"
+    return option[0]
+
+
+def _choose_spec_or_all(
+    project: Path,
+    cfg: Config,
+    spec_name: str | None,
+) -> SpecOption:
+    """Return either a spec tuple or ALL_SPECS_SENTINEL."""
+    specs = discover_specs(project, cfg)
+    if spec_name:
+        if spec_name.lower() == "all":
+            return ALL_SPECS_SENTINEL
+        for candidate, path in specs:
+            if candidate == spec_name:
+                return candidate, path
+        raise RunnerError(f"Spec '{spec_name}' not found under {project}")
+
+    options: list[SpecOption] = list(specs)
+    options.append(ALL_SPECS_SENTINEL)
+    return choose_option(f"Select spec within {project}", options, label=_label_option)
+
+
+def list_unfinished_specs(project: Path, cfg: Config) -> list[tuple[str, Path]]:
+    """Return specs that still have unfinished tasks."""
+    unfinished: list[tuple[str, Path]] = []
+    for name, spec_path in discover_specs(project, cfg):
+        tasks_path = spec_path / cfg.tasks_filename
+        if not tasks_path.exists():
+            continue
+        stats = read_task_stats(tasks_path)
+        if stats.total == 0:
+            continue
+        if stats.done < stats.total:
+            unfinished.append((name, spec_path))
+    return unfinished
+
+
+def run_all_specs(cfg: Config, project: Path, dry_run: bool) -> None:
+    """Sequentially run codex for every unfinished spec until all complete."""
+    print("\nRunning unfinished specs in sequence.")
+    while True:
+        unfinished = list_unfinished_specs(project, cfg)
+        if not unfinished:
+            print("No unfinished specs remaining. All caught up!")
+            return
+        spec_name, spec_path = unfinished[0]
+        print(f"\n==> Processing spec '{spec_name}'")
+        run_loop(cfg, project, spec_name, spec_path, dry_run)
+        if dry_run:
+            print("Dry-run mode: processed the first unfinished spec only.")
+            return
 
 
 def ensure_project(cfg: Config, explicit_path: Path | None) -> Path:
@@ -238,8 +303,12 @@ def main() -> int:
 
     try:
         project = ensure_project(cfg, args.project)
-        spec_name, spec_path = ensure_spec(project, cfg, args.spec)
-        run_loop(cfg, project, spec_name, spec_path, args.dry_run)
+        selection = _choose_spec_or_all(project, cfg, args.spec)
+        if isinstance(selection, AllSpecsSentinel):
+            run_all_specs(cfg, project, args.dry_run)
+        else:
+            spec_name, spec_path = selection
+            run_loop(cfg, project, spec_name, spec_path, args.dry_run)
         return 0
     except KeyboardInterrupt:
         print("\nAborted by user.")
