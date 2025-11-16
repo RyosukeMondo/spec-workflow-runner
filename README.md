@@ -4,6 +4,7 @@ Tools that keep the spec-workflow loop moving:
 
 - `spec-workflow-run` – orchestrates Codex runs until all tasks in a spec are complete.
 - `spec-workflow-monitor` – Rich-based dashboard to watch progress in real time.
+- `spec-workflow-pipx` – bootstraps/updates the pipx install used for global access.
 
 ## Installation
 
@@ -29,6 +30,18 @@ spec-workflow-monitor --project /path/to/repo --spec my-spec
 
 Both commands expect to find a `config.json` in the working directory unless a different
 `--config` path is provided.
+
+### pipx bootstrapper
+
+The repository ships with `spec-workflow-pipx`, which keeps a global pipx install of the
+current checkout fresh. Run it from the repo root:
+
+```bash
+spec-workflow-pipx --target .
+```
+
+Add `--debug` to inspect every command or `--target git+https://...` to install from a
+remote source. By default it forces a reinstall so `pipx install` doubles as an upgrade.
 
 ## Quality Toolkit
 

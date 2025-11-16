@@ -23,6 +23,7 @@ dev = [
 [project.scripts]
 spec-workflow-run = "spec_workflow_runner.run_tasks:main"
 spec-workflow-monitor = "spec_workflow_runner.monitor:main"
+spec-workflow-pipx = "spec_workflow_runner.pipx_installer:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/spec_workflow_runner"]
@@ -49,4 +50,3 @@ mypy_path = "src"
 [tool.pytest.ini_options]
 addopts = "-ra"
 testpaths = ["tests"]
-
