@@ -68,8 +68,8 @@ def test_list_unfinished_specs_filters_completed(tmp_path: Path) -> None:
     beta = specs_root / "beta"
     alpha.mkdir(parents=True)
     beta.mkdir(parents=True)
-    (alpha / cfg.tasks_filename).write_text("[ ] todo\n[x] done\n", encoding="utf-8")
-    (beta / cfg.tasks_filename).write_text("[x] done\n[x] done\n", encoding="utf-8")
+    (alpha / cfg.tasks_filename).write_text("- [ ] todo\n- [x] done\n", encoding="utf-8")
+    (beta / cfg.tasks_filename).write_text("- [x] done\n- [x] done\n", encoding="utf-8")
 
     unfinished = runner.list_unfinished_specs(tmp_path, cfg)
 
@@ -87,8 +87,8 @@ def test_run_all_specs_processes_each_unfinished_spec(tmp_path: Path, monkeypatc
     def _write_tasks(path: Path, content: str) -> None:
         (path / cfg.tasks_filename).write_text(content, encoding="utf-8")
 
-    _write_tasks(first, "[ ] pending\n")
-    _write_tasks(second, "[ ] todo\n")
+    _write_tasks(first, "- [ ] pending\n")
+    _write_tasks(second, "- [ ] todo\n")
 
     seen: list[str] = []
 
@@ -101,7 +101,7 @@ def test_run_all_specs_processes_each_unfinished_spec(tmp_path: Path, monkeypatc
     ) -> None:
         assert not dry_run
         seen.append(spec_name)
-        _write_tasks(spec_path, "[x] done\n")
+        _write_tasks(spec_path, "- [x] done\n")
 
     monkeypatch.setattr(runner, "run_loop", fake_run_loop)
 

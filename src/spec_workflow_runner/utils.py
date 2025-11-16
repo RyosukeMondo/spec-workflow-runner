@@ -100,7 +100,10 @@ def discover_specs(project_path: Path, cfg: Config) -> list[tuple[str, Path]]:
     return specs
 
 
-TASK_PATTERN = re.compile(r"\[(?P<state> |x|-)\]")
+TASK_PATTERN = re.compile(
+    r"^\s*-\s\[(?P<state>[ x-])\]",
+    re.MULTILINE | re.IGNORECASE,
+)
 
 
 def read_task_stats(tasks_path: Path) -> TaskStats:
