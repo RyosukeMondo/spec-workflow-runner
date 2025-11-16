@@ -1,13 +1,14 @@
 """Shared helpers for spec workflow automation scripts."""
+
 from __future__ import annotations
 
-from dataclasses import dataclass
 import json
 import os
-from pathlib import Path
 import re
-from typing import Callable, List, Sequence, Tuple, TypeVar
-
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TypeVar
 
 T = TypeVar("T")
 
@@ -23,14 +24,13 @@ class Config:
     codex_command: Sequence[str]
     prompt_template: str
     no_commit_limit: int
-    timeout_seconds: int
     log_dir_name: str
     log_file_template: str
-    ignore_dirs: Tuple[str, ...]
+    ignore_dirs: tuple[str, ...]
     monitor_refresh_seconds: int
 
     @classmethod
-    def from_dict(cls, payload: dict) -> "Config":
+    def from_dict(cls, payload: dict) -> Config:
         """Create a Config object from a raw dictionary."""
         repos_root = Path(os.path.expanduser(payload["repos_root"])).resolve()
         return cls(
@@ -41,7 +41,6 @@ class Config:
             codex_command=tuple(payload["codex_command"]),
             prompt_template=payload["prompt_template"],
             no_commit_limit=int(payload["no_commit_limit"]),
-            timeout_seconds=int(payload["timeout_seconds"]),
             log_dir_name=payload["log_dir_name"],
             log_file_template=payload["log_file_template"],
             ignore_dirs=tuple(payload.get("ignore_dirs", [])),
@@ -75,13 +74,13 @@ def load_config(path: Path) -> Config:
     return Config.from_dict(data)
 
 
-def discover_projects(cfg: Config) -> List[Path]:
+def discover_projects(cfg: Config) -> list[Path]:
     """Return every project directory under repos_root containing a .spec-workflow."""
     root = cfg.repos_root
     if not root.exists():
         raise FileNotFoundError(f"Repos root not found: {root}")
 
-    found: List[Path] = []
+    found: list[Path] = []
     for dirpath, dirnames, _ in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in cfg.ignore_dirs]
         if cfg.spec_workflow_dir_name in dirnames:
@@ -89,12 +88,12 @@ def discover_projects(cfg: Config) -> List[Path]:
     return sorted(found)
 
 
-def discover_specs(project_path: Path, cfg: Config) -> List[Tuple[str, Path]]:
+def discover_specs(project_path: Path, cfg: Config) -> list[tuple[str, Path]]:
     """List specs for the selected project."""
     specs_root = project_path / cfg.spec_workflow_dir_name / cfg.specs_subdir
     if not specs_root.exists():
         raise FileNotFoundError(f"No specs directory at {specs_root}")
-    specs: List[Tuple[str, Path]] = []
+    specs: list[tuple[str, Path]] = []
     for child in sorted(specs_root.iterdir()):
         if child.is_dir():
             specs.append((child.name, child))

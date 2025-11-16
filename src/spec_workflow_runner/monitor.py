@@ -1,9 +1,10 @@
 """Real-time monitor for spec-workflow task progress."""
+
 from __future__ import annotations
 
 import argparse
-from collections import deque
 import time
+from collections import deque
 from pathlib import Path
 
 from rich.console import Console, Group
@@ -15,6 +16,7 @@ from rich.text import Text
 
 from .utils import (
     Config,
+    TaskStats,
     choose_option,
     discover_projects,
     discover_specs,
@@ -124,7 +126,12 @@ class LogFollower:
         return max(candidates, key=lambda path: path.stat().st_mtime)
 
 
-def build_dashboard(project: Path, spec_name: str, stats, log_panel: Panel) -> Group:
+def build_dashboard(
+    project: Path,
+    spec_name: str,
+    stats: TaskStats,
+    log_panel: Panel,
+) -> Group:
     """Return Rich renderables summarizing the current progress and logs."""
     table = Table.grid(padding=(0, 1))
     table.add_row("[bold]Project[/bold]", str(project))
@@ -160,7 +167,9 @@ def monitor(cfg: Config, project: Path, spec_name: str, spec_path: Path) -> None
     console = Console()
     refresh = cfg.monitor_refresh_seconds
     log_dir = project / cfg.log_dir_name / spec_name
-    pattern = cfg.log_file_template.replace("{index}", "*") if "{index}" in cfg.log_file_template else "*"
+    pattern = (
+        cfg.log_file_template.replace("{index}", "*") if "{index}" in cfg.log_file_template else "*"
+    )
     follower = LogFollower(log_dir, pattern)
 
     with Live(console=console, refresh_per_second=4) as live:

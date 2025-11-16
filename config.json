@@ -6,7 +6,6 @@
   "codex_command": ["codex", "e"],
   "prompt_template": "Please work on only single remaining task for spec {spec_name} and make commit on completion.",
   "no_commit_limit": 3,
-  "timeout_seconds": 600,
   "log_dir_name": "logs",
   "log_file_template": "task_{index}.log",
   "ignore_dirs": [".git", ".next", "node_modules", "dist"],

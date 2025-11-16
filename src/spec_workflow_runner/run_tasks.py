@@ -1,15 +1,15 @@
 """Interactive runner that loops through spec-workflow tasks via codex."""
+
 from __future__ import annotations
 
 import argparse
-from datetime import UTC, datetime, timedelta
 import shlex
 import subprocess
 import sys
 import textwrap
-import time
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Callable, Optional
+from typing import TextIO
 
 from .utils import (
     Config,
@@ -24,31 +24,6 @@ from .utils import (
 
 class RunnerError(Exception):
     """Raised when the run needs to abort early."""
-
-
-class TimeoutBudget:
-    """Track elapsed time between iterations and flag overages."""
-
-    def __init__(
-        self,
-        seconds: int,
-        *,
-        monotonic: Callable[[], float] = time.monotonic,
-    ) -> None:
-        self._limit = timedelta(seconds=seconds)
-        self._monotonic = monotonic
-        self._started_at = self._monotonic()
-
-    def reset(self) -> None:
-        """Start a new timeout window."""
-
-        self._started_at = self._monotonic()
-
-    def expired(self) -> bool:
-        """Return True when the timeout window has been exceeded."""
-
-        elapsed = timedelta(seconds=self._monotonic() - self._started_at)
-        return elapsed > self._limit
 
 
 def parse_args() -> argparse.Namespace:
@@ -92,7 +67,7 @@ def get_current_commit(repo_path: Path) -> str:
     return result.stdout.strip()
 
 
-def ensure_spec(project: Path, cfg: Config, spec_name: Optional[str]) -> tuple[str, Path]:
+def ensure_spec(project: Path, cfg: Config, spec_name: str | None) -> tuple[str, Path]:
     """Return the spec name and directory, optionally prompting the user."""
     specs = discover_specs(project, cfg)
     if spec_name:
@@ -108,7 +83,7 @@ def ensure_spec(project: Path, cfg: Config, spec_name: Optional[str]) -> tuple[s
     return name, spec_path
 
 
-def ensure_project(cfg: Config, explicit_path: Optional[Path]) -> Path:
+def ensure_project(cfg: Config, explicit_path: Path | None) -> Path:
     """Resolve the project directory."""
     if explicit_path:
         return explicit_path.resolve()
@@ -164,15 +139,13 @@ def run_codex(
         """
     )
 
-    def _print_and_log(message: str, handle) -> None:
+    def _print_and_log(message: str, handle: TextIO) -> None:
         print(message, end="")
         handle.write(message)
         handle.flush()
 
     if dry_run:
-        simulated = (
-            f"[dry-run] Would run: {' '.join(cfg.codex_command)} {prompt!r}\n"
-        )
+        simulated = f"[dry-run] Would run: {' '.join(cfg.codex_command)} {prompt!r}\n"
         with log_path.open("w", encoding="utf-8") as handle:
             handle.write(header)
             handle.write(simulated)
@@ -218,7 +191,6 @@ def run_loop(
     no_commit_streak = 0
     iteration = 0
     log_dir = project_path / cfg.log_dir_name / spec_name
-    timeout = TimeoutBudget(cfg.timeout_seconds)
     last_commit = get_current_commit(project_path)
 
     while True:
@@ -230,9 +202,6 @@ def run_loop(
         if remaining <= 0:
             print("All tasks complete. Nothing more to run.")
             return
-
-        if timeout.expired():
-            raise RunnerError("Timeout exceeded. Aborting.")
 
         iteration += 1
         prompt = build_prompt(cfg, spec_name, stats)
@@ -246,7 +215,6 @@ def run_loop(
             iteration=iteration,
             log_path=log_path,
         )
-        timeout.reset()
         if dry_run:
             print("Dry-run mode: skipping commit checks and exiting after first iteration.")
             return
