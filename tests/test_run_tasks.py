@@ -2,15 +2,22 @@
 
 from __future__ import annotations
 
+import io
 from pathlib import Path
 
+import pytest
+
 from spec_workflow_runner import run_tasks as runner
+from spec_workflow_runner.providers import CodexProvider
 from spec_workflow_runner.utils import Config, TaskStats
 
 DEFAULT_PROMPT_TEMPLATE = "{spec_name}:{tasks_remaining}:{tasks_in_progress}"
 
 
-def _make_config(prompt_template: str = DEFAULT_PROMPT_TEMPLATE) -> Config:
+def _make_config(
+    prompt_template: str = DEFAULT_PROMPT_TEMPLATE,
+    overrides: tuple[tuple[str, str], ...] | None = None,
+) -> Config:
     """Return a Config tailored for unit tests."""
 
     return Config(
@@ -18,13 +25,16 @@ def _make_config(prompt_template: str = DEFAULT_PROMPT_TEMPLATE) -> Config:
         spec_workflow_dir_name=".spec-workflow",
         specs_subdir="specs",
         tasks_filename="tasks.md",
-        codex_command=("codex", "e"),
+        codex_command=("codex", "e", "--dangerously-bypass-approvals-and-sandbox"),
         prompt_template=prompt_template,
         no_commit_limit=3,
         log_dir_name="logs",
         log_file_template="task_{index}.log",
         ignore_dirs=(),
         monitor_refresh_seconds=5,
+        cache_dir=Path("/tmp/cache"),
+        cache_max_age_days=7,
+        codex_config_overrides=tuple(overrides or ()),
     )
 
 
@@ -38,12 +48,14 @@ def test_build_prompt_uses_remaining_tasks() -> None:
     assert prompt == "alpha:4:1"
 
 
-def test_run_codex_dry_run_writes_log(tmp_path, capsys) -> None:
+def test_run_provider_dry_run_writes_log(tmp_path, capsys) -> None:
     cfg = _make_config()
+    provider = CodexProvider()
     prompt = "demo prompt"
     log_path = tmp_path / "logs" / "task_1.log"
 
-    runner.run_codex(
+    runner.run_provider(
+        provider,
         cfg,
         project_path=tmp_path,
         prompt=prompt,
@@ -59,6 +71,56 @@ def test_run_codex_dry_run_writes_log(tmp_path, capsys) -> None:
 
     stdout = capsys.readouterr().out
     assert "Saved log" in stdout
+
+
+def test_run_provider_applies_config_overrides(tmp_path, monkeypatch) -> None:
+    overrides = (
+        ("mcp_servers.demo.tool_timeout_sec", "60"),
+        ("features.example", '"value"'),
+    )
+    cfg = _make_config(overrides=overrides)
+    provider = CodexProvider()
+    prompt = "demo prompt"
+    log_path = tmp_path / "logs" / "task_1.log"
+
+    recorded: dict[str, object] = {}
+
+    class DummyProcess:
+        def __init__(self) -> None:
+            self.stdout = io.BytesIO(b"ok\n")
+            self.returncode = 0
+
+        def wait(self) -> None:
+            return None
+
+    def fake_popen(command, **kwargs):  # type: ignore[no-untyped-def]
+        recorded["command"] = command
+        recorded["kwargs"] = kwargs
+        return DummyProcess()
+
+    monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
+
+    runner.run_provider(
+        provider,
+        cfg,
+        project_path=tmp_path,
+        prompt=prompt,
+        dry_run=False,
+        spec_name="alpha",
+        iteration=1,
+        log_path=log_path,
+    )
+
+    assert recorded["command"] == [
+        "codex",
+        "e",
+        "--dangerously-bypass-approvals-and-sandbox",
+        "-c",
+        "mcp_servers.demo.tool_timeout_sec=60",
+        "-c",
+        'features.example="value"',
+        prompt,
+    ]
 
 
 def test_list_unfinished_specs_filters_completed(tmp_path: Path) -> None:
@@ -78,6 +140,7 @@ def test_list_unfinished_specs_filters_completed(tmp_path: Path) -> None:
 
 def test_run_all_specs_processes_each_unfinished_spec(tmp_path: Path, monkeypatch) -> None:
     cfg = _make_config()
+    provider = CodexProvider()
     specs_root = tmp_path / cfg.spec_workflow_dir_name / cfg.specs_subdir
     first = specs_root / "alpha"
     second = specs_root / "beta"
@@ -93,6 +156,7 @@ def test_run_all_specs_processes_each_unfinished_spec(tmp_path: Path, monkeypatc
     seen: list[str] = []
 
     def fake_run_loop(
+        _provider,  # type: ignore[no-untyped-def]
         _cfg: Config,
         _project: Path,
         spec_name: str,
@@ -105,6 +169,148 @@ def test_run_all_specs_processes_each_unfinished_spec(tmp_path: Path, monkeypatc
 
     monkeypatch.setattr(runner, "run_loop", fake_run_loop)
 
-    runner.run_all_specs(cfg, tmp_path, dry_run=False)
+    runner.run_all_specs(provider, cfg, tmp_path, dry_run=False)
 
     assert seen == ["alpha", "beta"]
+
+
+def test_ensure_provider_returns_explicit_value() -> None:
+    result = runner.ensure_provider("claude")
+    assert result == "claude"
+
+    result = runner.ensure_provider("codex")
+    assert result == "codex"
+
+
+def test_ensure_provider_prompts_when_none(monkeypatch) -> None:
+    def fake_input(_prompt: str) -> str:
+        return "1"
+
+    monkeypatch.setattr("builtins.input", fake_input)
+    result = runner.ensure_provider(None)
+    assert result in ("codex", "claude")
+
+
+def test_has_uncommitted_changes_detects_new_files(tmp_path: Path) -> None:
+    import subprocess
+
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test User"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    (tmp_path / "initial.txt").write_text("initial", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "initial"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+
+    assert not runner.has_uncommitted_changes(tmp_path)
+
+    (tmp_path / "new.txt").write_text("new file", encoding="utf-8")
+    assert runner.has_uncommitted_changes(tmp_path)
+
+
+def test_has_uncommitted_changes_detects_modified_files(tmp_path: Path) -> None:
+    import subprocess
+
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test User"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    test_file = tmp_path / "test.txt"
+    test_file.write_text("initial", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "initial"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+
+    assert not runner.has_uncommitted_changes(tmp_path)
+
+    test_file.write_text("modified", encoding="utf-8")
+    assert runner.has_uncommitted_changes(tmp_path)
+
+
+def test_check_clean_working_tree_passes_when_clean(tmp_path: Path) -> None:
+    import subprocess
+
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "config", "user.email", "test@example.com"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    subprocess.run(
+        ["git", "config", "user.name", "Test User"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+    (tmp_path / "test.txt").write_text("content", encoding="utf-8")
+    subprocess.run(["git", "add", "."], cwd=tmp_path, check=True, capture_output=True)
+    subprocess.run(
+        ["git", "commit", "-m", "initial"],
+        cwd=tmp_path,
+        check=True,
+        capture_output=True,
+    )
+
+    runner.check_clean_working_tree(tmp_path)
+
+
+def test_check_clean_working_tree_aborts_on_choice_1(tmp_path: Path, monkeypatch) -> None:
+    import subprocess
+
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    (tmp_path / "uncommitted.txt").write_text("uncommitted", encoding="utf-8")
+
+    def fake_input(_prompt: str) -> str:
+        return "1"
+
+    monkeypatch.setattr("builtins.input", fake_input)
+
+    with pytest.raises(runner.RunnerError, match="Aborted"):
+        runner.check_clean_working_tree(tmp_path)
+
+
+def test_check_clean_working_tree_continues_on_choice_2(
+    tmp_path: Path, monkeypatch, capsys
+) -> None:
+    import subprocess
+
+    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
+    (tmp_path / "uncommitted.txt").write_text("uncommitted", encoding="utf-8")
+
+    def fake_input(_prompt: str) -> str:
+        return "2"
+
+    monkeypatch.setattr("builtins.input", fake_input)
+
+    runner.check_clean_working_tree(tmp_path)
+
+    output = capsys.readouterr().out
+    assert "Continuing with uncommitted changes" in output

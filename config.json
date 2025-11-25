@@ -3,11 +3,17 @@
   "spec_workflow_dir_name": ".spec-workflow",
   "specs_subdir": "specs",
   "tasks_filename": "tasks.md",
-  "codex_command": ["codex", "e"],
-  "prompt_template": "Please work on only single remaining task for spec {spec_name} and make commit on completion.",
+  "codex_command": ["codex", "e", "--dangerously-bypass-approvals-and-sandbox"],
+  "prompt_template": "Work on the single next task for spec {spec_name}. When you complete a logical unit of work, you MUST run 'git add' followed by 'git commit' with a clear message. DO NOT just stage files - you must actually commit them. DO NOT ask permission - just commit immediately when work is done. Make atomic commits for each semantic group of changes.",
   "no_commit_limit": 3,
   "log_dir_name": "logs",
   "log_file_template": "task_{index}.log",
   "ignore_dirs": [".git", ".next", "node_modules", "dist"],
-  "monitor_refresh_seconds": 5
+  "monitor_refresh_seconds": 5,
+  "cache_dir": "~/.cache/spec-workflow-runner",
+  "cache_max_age_days": 7,
+  "codex_config_overrides": {
+    "mcp_servers.spec-workflow.tool_timeout_sec": 60,
+    "mcp_servers.spec-workflow.startup_timeout_sec": 60
+  }
 }

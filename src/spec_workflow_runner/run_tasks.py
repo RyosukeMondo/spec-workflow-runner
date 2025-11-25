@@ -1,8 +1,9 @@
-"""Interactive runner that loops through spec-workflow tasks via codex."""
+"""Interactive runner that loops through spec-workflow tasks via AI providers."""
 
 from __future__ import annotations
 
 import argparse
+import os
 import shlex
 import subprocess
 import sys
@@ -11,6 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TextIO
 
+from .providers import Provider, create_provider
 from .utils import (
     Config,
     TaskStats,
@@ -37,7 +39,7 @@ class RunnerError(Exception):
 def parse_args() -> argparse.Namespace:
     """Return CLI arguments for the runner."""
     parser = argparse.ArgumentParser(
-        description="Run codex against remaining spec tasks until finished.",
+        description="Run AI provider against remaining spec tasks until finished.",
     )
     parser.add_argument(
         "--config",
@@ -56,9 +58,20 @@ def parse_args() -> argparse.Namespace:
         help="Optional spec name to skip spec selection.",
     )
     parser.add_argument(
+        "--provider",
+        type=str,
+        choices=["claude", "codex"],
+        help="AI provider to use (prompts if not specified).",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Skip codex execution; useful for smoke testing.",
+        help="Skip execution; useful for smoke testing.",
+    )
+    parser.add_argument(
+        "--refresh-cache",
+        action="store_true",
+        help="Force refresh of project cache, ignoring existing cache.",
     )
     return parser.parse_args()
 
@@ -73,6 +86,80 @@ def get_current_commit(repo_path: Path) -> str:
         check=True,
     )
     return result.stdout.strip()
+
+
+def has_uncommitted_changes(repo_path: Path) -> bool:
+    """Check if there are uncommitted changes (staged or unstaged)."""
+    result = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=repo_path,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return bool(result.stdout.strip())
+
+
+def check_clean_working_tree(repo_path: Path) -> None:
+    """Ensure working tree is clean before starting, prompting user if needed."""
+    if not has_uncommitted_changes(repo_path):
+        return
+
+    print("\n⚠️  Warning: Uncommitted changes detected in the repository.")
+    print("   This will interfere with commit detection during the run.")
+    print("\nOptions:")
+    print("  1. Abort and let me commit/stash changes first (recommended)")
+    print("  2. Continue anyway (commit detection may be unreliable)")
+
+    while True:
+        choice = input("\nSelect option (1 or 2): ").strip()
+        if choice == "1":
+            raise RunnerError("Aborted. Please commit or stash your changes, then run again.")
+        if choice == "2":
+            print("\n⚠️  Continuing with uncommitted changes. Commit detection may be unreliable.")
+            return
+        print("Invalid choice. Please enter 1 or 2.")
+
+
+def check_mcp_server_exists(provider: Provider, project_path: Path) -> None:
+    """Ensure spec-workflow MCP server is configured for the provider."""
+    mcp_cmd = provider.get_mcp_list_command()
+    command = mcp_cmd.to_list()
+
+    try:
+        result = subprocess.run(
+            command,
+            cwd=project_path,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        if result.returncode != 0:
+            print(f"\n⚠️  Warning: Could not list MCP servers for {provider.get_provider_name()}.")
+            print(f"   Command failed: {' '.join(command)}")
+            print(f"   Error: {result.stderr.strip()}")
+            print("\n   Task tracking may not work properly without the spec-workflow MCP server.")
+            return
+
+        output = result.stdout.lower()
+        if "spec-workflow" not in output:
+            executable = provider.get_mcp_list_command().executable
+            raise RunnerError(
+                f"spec-workflow MCP server not found for {provider.get_provider_name()}.\n"
+                f"   The spec-workflow MCP server is required for automatic task tracking.\n"
+                f"   Please configure it by running: {executable} mcp\n"
+                f"   Or check your MCP server configuration."
+            )
+
+        print(f"✓ spec-workflow MCP server detected for {provider.get_provider_name()}")
+
+    except FileNotFoundError as err:
+        executable = provider.get_mcp_list_command().executable
+        raise RunnerError(
+            f"{executable} command not found.\n"
+            f"   Please ensure {provider.get_provider_name()} is installed and available in PATH."
+        ) from err
 
 
 def ensure_spec(project: Path, cfg: Config, spec_name: str | None) -> tuple[str, Path]:
@@ -132,8 +219,13 @@ def list_unfinished_specs(project: Path, cfg: Config) -> list[tuple[str, Path]]:
     return unfinished
 
 
-def run_all_specs(cfg: Config, project: Path, dry_run: bool) -> None:
-    """Sequentially run codex for every unfinished spec until all complete."""
+def run_all_specs(
+    provider: Provider,
+    cfg: Config,
+    project: Path,
+    dry_run: bool,
+) -> None:
+    """Sequentially run provider for every unfinished spec until all complete."""
     print("\nRunning unfinished specs in sequence.")
     while True:
         unfinished = list_unfinished_specs(project, cfg)
@@ -142,22 +234,37 @@ def run_all_specs(cfg: Config, project: Path, dry_run: bool) -> None:
             return
         spec_name, spec_path = unfinished[0]
         print(f"\n==> Processing spec '{spec_name}'")
-        run_loop(cfg, project, spec_name, spec_path, dry_run)
+        run_loop(provider, cfg, project, spec_name, spec_path, dry_run)
         if dry_run:
             print("Dry-run mode: processed the first unfinished spec only.")
             return
 
 
-def ensure_project(cfg: Config, explicit_path: Path | None) -> Path:
+def ensure_project(cfg: Config, explicit_path: Path | None, refresh_cache: bool) -> Path:
     """Resolve the project directory."""
     if explicit_path:
         return explicit_path.resolve()
-    projects = discover_projects(cfg)
+    projects = discover_projects(cfg, force_refresh=refresh_cache)
     return choose_option(
         "Select project",
         projects,
         label=lambda path: f"{path.name}  ({path})",
     )
+
+
+def ensure_provider(explicit_provider: str | None) -> str:
+    """Resolve the provider to use, prompting if not specified."""
+    if explicit_provider:
+        return explicit_provider
+    providers = [
+        ("codex", "Codex with MCP server support"),
+        ("claude", "Claude CLI (automation mode, no prompts)"),
+    ]
+    return choose_option(
+        "Select AI provider",
+        providers,
+        label=lambda pair: f"{pair[0]:8} - {pair[1]}",
+    )[0]
 
 
 def build_prompt(cfg: Config, spec_name: str, stats: TaskStats) -> str:
@@ -174,7 +281,8 @@ def build_prompt(cfg: Config, spec_name: str, stats: TaskStats) -> str:
     return cfg.prompt_template.format(**context)
 
 
-def run_codex(
+def run_provider(
+    provider: Provider,
     cfg: Config,
     project_path: Path,
     prompt: str,
@@ -184,9 +292,10 @@ def run_codex(
     iteration: int,
     log_path: Path,
 ) -> None:
-    """Execute the codex command and stream output into a log file."""
+    """Execute the provider command and stream output into a log file."""
     log_path.parent.mkdir(parents=True, exist_ok=True)
-    command = list(cfg.codex_command) + [prompt]
+    provider_cmd = provider.build_command(prompt, project_path, cfg.codex_config_overrides)
+    command = provider_cmd.to_list()
     started = datetime.now(UTC).isoformat()
     formatted_command = " ".join(shlex.quote(part) for part in command)
     header = textwrap.dedent(
@@ -210,7 +319,7 @@ def run_codex(
         handle.flush()
 
     if dry_run:
-        simulated = f"[dry-run] Would run: {' '.join(cfg.codex_command)} {prompt!r}\n"
+        simulated = f"[dry-run] Would run: {formatted_command}\n"
         with log_path.open("w", encoding="utf-8") as handle:
             handle.write(header)
             handle.write(simulated)
@@ -220,6 +329,9 @@ def run_codex(
         return
 
     print("\nRunning:", formatted_command)
+    env = os.environ.copy()
+    env["PYTHONUNBUFFERED"] = "1"
+
     with log_path.open("w", encoding="utf-8") as handle:
         handle.write(header)
         proc = subprocess.Popen(
@@ -227,21 +339,23 @@ def run_codex(
             cwd=project_path,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
-            text=True,
-            bufsize=1,
+            bufsize=0,
+            env=env,
         )
         assert proc.stdout is not None
-        for line in proc.stdout:
-            _print_and_log(line, handle)
+        for line in iter(proc.stdout.readline, b""):
+            decoded = line.decode("utf-8", errors="replace")
+            _print_and_log(decoded, handle)
         proc.wait()
         handle.write(f"\n# Exit Code\n{proc.returncode}\n")
 
     if proc.returncode != 0:
-        raise RunnerError("codex command failed. See log for details.")
+        raise RunnerError("Provider command failed. See log for details.")
     print(f"Saved log: {log_path}")
 
 
 def run_loop(
+    provider: Provider,
     cfg: Config,
     project_path: Path,
     spec_name: str,
@@ -271,7 +385,8 @@ def run_loop(
         iteration += 1
         prompt = build_prompt(cfg, spec_name, stats)
         log_path = log_dir / cfg.log_file_template.format(index=iteration)
-        run_codex(
+        run_provider(
+            provider,
             cfg,
             project_path,
             prompt,
@@ -291,8 +406,22 @@ def run_loop(
             last_commit = new_commit
         else:
             no_commit_streak += 1
-            print(f"No new commit detected. Streak: {no_commit_streak}/{cfg.no_commit_limit}")
+            has_changes = has_uncommitted_changes(project_path)
+            if has_changes:
+                print(
+                    f"⚠️  No new commit detected, but uncommitted changes exist! "
+                    f"Streak: {no_commit_streak}/{cfg.no_commit_limit}"
+                )
+                print("   The AI may have created/modified files but didn't commit them.")
+                print("   Check 'git status' to see what changed.")
+            else:
+                print(f"No new commit detected. Streak: {no_commit_streak}/{cfg.no_commit_limit}")
             if no_commit_streak >= cfg.no_commit_limit:
+                if has_changes:
+                    raise RunnerError(
+                        "Circuit breaker: reached consecutive no-commit limit. "
+                        "Uncommitted changes exist - the AI is not committing as instructed!"
+                    )
                 raise RunnerError("Circuit breaker: reached consecutive no-commit limit.")
 
 
@@ -302,13 +431,20 @@ def main() -> int:
     cfg = load_config(args.config)
 
     try:
-        project = ensure_project(cfg, args.project)
+        provider_name = ensure_provider(args.provider)
+        provider = create_provider(provider_name, cfg.codex_command)
+        project = ensure_project(cfg, args.project, args.refresh_cache)
+
+        if not args.dry_run:
+            check_clean_working_tree(project)
+            check_mcp_server_exists(provider, project)
+
         selection = _choose_spec_or_all(project, cfg, args.spec)
         if isinstance(selection, AllSpecsSentinel):
-            run_all_specs(cfg, project, args.dry_run)
+            run_all_specs(provider, cfg, project, args.dry_run)
         else:
             spec_name, spec_path = selection
-            run_loop(cfg, project, spec_name, spec_path, args.dry_run)
+            run_loop(provider, cfg, project, spec_name, spec_path, args.dry_run)
         return 0
     except KeyboardInterrupt:
         print("\nAborted by user.")
