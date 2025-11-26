@@ -248,6 +248,11 @@ def read_task_stats(tasks_path: Path) -> TaskStats:
     return TaskStats(done=done, pending=pending, in_progress=in_progress)
 
 
+def _is_filter_string(text: str) -> bool:
+    """Check if text is a valid filter string (folder-safe characters)."""
+    return bool(re.match(r"^[a-zA-Z_\-]+$", text))
+
+
 def choose_option(
     title: str,
     options: Sequence[T],
@@ -255,26 +260,57 @@ def choose_option(
     *,
     allow_quit: bool = True,
 ) -> T:
-    """Display a simple numeric menu and return the selected item."""
+    """Display a simple numeric menu and return the selected item.
+
+    Supports filtering:
+    - Enter text to filter options by partial match
+    - Press Enter (empty) to reset filter
+    - Enter number to select from current list
+    """
     if not options:
         raise ValueError(f"No options available for {title}")
 
+    current_filter = ""
+    filtered_options: Sequence[T] = options
+
     while True:
-        print(f"\n{title}")
-        for idx, option in enumerate(options, start=1):
+        filter_info = f" [filter: '{current_filter}']" if current_filter else ""
+        print(f"\n{title}{filter_info}")
+        for idx, option in enumerate(filtered_options, start=1):
             print(f"  {idx}. {label(option)}")
-        prompt = "Select option"
+
+        if not filtered_options:
+            print("  (no matches)")
+
+        prompt = "Select # or filter text"
+        if current_filter:
+            prompt += " (Enter to reset)"
         if allow_quit:
-            prompt += " (or q to quit)"
+            prompt += " (q to quit)"
         prompt += ": "
-        choice = input(prompt).strip().lower()
-        if allow_quit and choice in {"q", "quit"}:
+        choice = input(prompt).strip()
+
+        if allow_quit and choice.lower() in {"q", "quit"}:
             raise KeyboardInterrupt("User cancelled selection")
+
+        if choice == "":
+            current_filter = ""
+            filtered_options = options
+            continue
+
+        if _is_filter_string(choice):
+            current_filter = choice.lower()
+            filtered_options = [
+                opt for opt in options if current_filter in label(opt).lower()
+            ]
+            continue
+
         try:
             numeric = int(choice)
         except ValueError:
-            print("Please enter a valid number.")
+            print("Invalid input. Use text to filter or number to select.")
             continue
-        if 1 <= numeric <= len(options):
-            return options[numeric - 1]
+
+        if 1 <= numeric <= len(filtered_options):
+            return filtered_options[numeric - 1]
         print("Choice out of range, try again.")
