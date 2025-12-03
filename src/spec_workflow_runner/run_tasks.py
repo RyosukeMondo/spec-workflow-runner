@@ -199,14 +199,13 @@ def _choose_spec_or_all(
                 return candidate, path
         raise RunnerError(f"Spec '{spec_name}' not found under {project}")
 
-    options: list[SpecOption] = list(specs)
-    options.append(ALL_SPECS_SENTINEL)
+    options: list[SpecOption] = [ALL_SPECS_SENTINEL, *specs]
     return choose_option(f"Select spec within {project}", options, label=_label_option)
 
 
 def list_unfinished_specs(project: Path, cfg: Config) -> list[tuple[str, Path]]:
-    """Return specs that still have unfinished tasks."""
-    unfinished: list[tuple[str, Path]] = []
+    """Return specs with unfinished tasks, sorted by directory creation time (oldest first)."""
+    unfinished_with_ctime: list[tuple[float, str, Path]] = []
     for name, spec_path in discover_specs(project, cfg):
         tasks_path = spec_path / cfg.tasks_filename
         if not tasks_path.exists():
@@ -215,8 +214,14 @@ def list_unfinished_specs(project: Path, cfg: Config) -> list[tuple[str, Path]]:
         if stats.total == 0:
             continue
         if stats.done < stats.total:
-            unfinished.append((name, spec_path))
-    return unfinished
+            ctime = spec_path.stat().st_ctime
+            unfinished_with_ctime.append((ctime, name, spec_path))
+
+    # Sort by creation time (oldest first)
+    unfinished_with_ctime.sort(key=lambda x: x[0])
+
+    # Return without the timestamp
+    return [(name, spec_path) for _, name, spec_path in unfinished_with_ctime]
 
 
 def run_all_specs(

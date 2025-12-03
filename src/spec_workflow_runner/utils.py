@@ -300,9 +300,7 @@ def choose_option(
 
         if _is_filter_string(choice):
             current_filter = choice.lower()
-            filtered_options = [
-                opt for opt in options if current_filter in label(opt).lower()
-            ]
+            filtered_options = [opt for opt in options if current_filter in label(opt).lower()]
             continue
 
         try:
