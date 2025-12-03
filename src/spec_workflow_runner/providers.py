@@ -44,11 +44,20 @@ class Provider(ABC):
 class CodexProvider(Provider):
     """Provider for Codex backend."""
 
+    SUPPORTED_MODELS = (
+        "gpt-5.1-codex-max",
+        "gpt-5.1-codex",
+        "gpt-5.1-codex-mini",
+        "gpt-5-codex",
+    )
+
     def __init__(
         self,
         base_command: Sequence[str] = ("codex", "e", "--dangerously-bypass-approvals-and-sandbox"),
+        model: str | None = None,
     ) -> None:
         self._base_command = tuple(base_command)
+        self._model = model
 
     def build_command(
         self,
@@ -56,9 +65,11 @@ class CodexProvider(Provider):
         project_path: Path,
         config_overrides: Sequence[tuple[str, str]],
     ) -> ProviderCommand:
-        """Build codex command with config overrides."""
+        """Build codex command with config overrides and model selection."""
         executable = self._base_command[0]
         args: list[str] = list(self._base_command[1:])
+        if self._model:
+            args.extend(["--model", self._model])
         for key, value in config_overrides:
             args.extend(["-c", f"{key}={value}"])
         args.append(prompt)
@@ -76,13 +87,21 @@ class CodexProvider(Provider):
 class ClaudeProvider(Provider):
     """Provider for Claude CLI backend."""
 
+    SUPPORTED_MODELS = (
+        "sonnet",
+        "haiku",
+        "opus",
+    )
+
     def __init__(
         self,
         executable: str = "claude",
         skip_permissions: bool = True,
+        model: str | None = None,
     ) -> None:
         self._executable = executable
         self._skip_permissions = skip_permissions
+        self._model = model
 
     def build_command(
         self,
@@ -90,8 +109,10 @@ class ClaudeProvider(Provider):
         project_path: Path,
         config_overrides: Sequence[tuple[str, str]],
     ) -> ProviderCommand:
-        """Build claude command with permissions skipped for automation."""
+        """Build claude command with permissions skipped for automation and model selection."""
         args = ["-p", prompt]
+        if self._model:
+            args.extend(["--model", self._model])
         if self._skip_permissions:
             args.append("--dangerously-skip-permissions")
         return ProviderCommand(executable=self._executable, args=tuple(args))
@@ -105,10 +126,23 @@ class ClaudeProvider(Provider):
         return "Claude CLI"
 
 
-def create_provider(provider_name: str, base_command: Sequence[str]) -> Provider:
+def get_supported_models(provider_name: str) -> tuple[str, ...]:
+    """Get the list of supported models for a given provider."""
+    if provider_name == "codex":
+        return CodexProvider.SUPPORTED_MODELS
+    if provider_name == "claude":
+        return ClaudeProvider.SUPPORTED_MODELS
+    raise ValueError(f"Unknown provider: {provider_name}")
+
+
+def create_provider(
+    provider_name: str,
+    base_command: Sequence[str],
+    model: str | None = None,
+) -> Provider:
     """Factory function to create a provider by name."""
     if provider_name == "codex":
-        return CodexProvider(base_command=base_command)
+        return CodexProvider(base_command=base_command, model=model)
     if provider_name == "claude":
-        return ClaudeProvider()
+        return ClaudeProvider(model=model)
     raise ValueError(f"Unknown provider: {provider_name}")

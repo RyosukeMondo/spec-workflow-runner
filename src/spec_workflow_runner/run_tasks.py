@@ -12,7 +12,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TextIO
 
-from .providers import Provider, create_provider
+from .providers import Provider, create_provider, get_supported_models
 from .utils import (
     Config,
     TaskStats,
@@ -62,6 +62,14 @@ def parse_args() -> argparse.Namespace:
         type=str,
         choices=["claude", "codex"],
         help="AI provider to use (prompts if not specified).",
+    )
+    parser.add_argument(
+        "--model",
+        type=str,
+        help=(
+            "AI model to use (prompts if not specified). "
+            "Codex: gpt-5.1-codex-max, gpt-5.1-codex, etc. Claude: sonnet, haiku, opus."
+        ),
     )
     parser.add_argument(
         "--dry-run",
@@ -272,6 +280,31 @@ def ensure_provider(explicit_provider: str | None) -> str:
     )[0]
 
 
+def ensure_model(provider_name: str, explicit_model: str | None) -> str | None:
+    """Resolve the model to use for the provider, prompting if not specified."""
+    if explicit_model:
+        return explicit_model
+
+    supported_models = get_supported_models(provider_name)
+    model_descriptions = {
+        "gpt-5.1-codex-max": "Latest frontier agentic coding model (recommended)",
+        "gpt-5.1-codex": "Reasoning model with strong performance",
+        "gpt-5.1-codex-mini": "Smaller, cost-effective version",
+        "gpt-5-codex": "Previous generation model",
+        "sonnet": "Latest Sonnet - best coding model (recommended)",
+        "haiku": "Fast and cost-effective (3x cheaper, 2x faster)",
+        "opus": "Most intelligent for complex tasks",
+    }
+
+    models_with_desc = [(model, model_descriptions.get(model, "")) for model in supported_models]
+
+    return choose_option(
+        f"Select model for {provider_name}",
+        models_with_desc,
+        label=lambda pair: f"{pair[0]:20} - {pair[1]}" if pair[1] else pair[0],
+    )[0]
+
+
 def build_prompt(cfg: Config, spec_name: str, stats: TaskStats) -> str:
     """Format the codex prompt using the config template."""
     remaining = stats.total - stats.done
@@ -437,7 +470,8 @@ def main() -> int:
 
     try:
         provider_name = ensure_provider(args.provider)
-        provider = create_provider(provider_name, cfg.codex_command)
+        model = ensure_model(provider_name, args.model)
+        provider = create_provider(provider_name, cfg.codex_command, model)
         project = ensure_project(cfg, args.project, args.refresh_cache)
 
         if not args.dry_run:
