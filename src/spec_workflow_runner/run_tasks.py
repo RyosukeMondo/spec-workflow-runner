@@ -15,10 +15,17 @@ from typing import TextIO
 from .providers import Provider, create_provider, get_supported_models
 from .utils import (
     Config,
+    RunnerError,
     TaskStats,
+    check_clean_working_tree,
+    check_mcp_server_exists,
     choose_option,
     discover_projects,
     discover_specs,
+    display_spec_queue,
+    get_current_commit,
+    has_uncommitted_changes,
+    list_unfinished_specs,
     load_config,
     read_task_stats,
 )
@@ -28,12 +35,15 @@ class AllSpecsSentinel:
     """Marker object representing the 'run all specs' selection."""
 
 
+class MultipleSpecsSentinel:
+    """Marker object representing multiple selected specs."""
+
+    def __init__(self, specs: list[tuple[str, Path]]) -> None:
+        self.specs = specs
+
+
 ALL_SPECS_SENTINEL = AllSpecsSentinel()
-SpecOption = tuple[str, Path] | AllSpecsSentinel
-
-
-class RunnerError(Exception):
-    """Raised when the run needs to abort early."""
+SpecOption = tuple[str, Path] | AllSpecsSentinel | MultipleSpecsSentinel
 
 
 def parse_args() -> argparse.Namespace:
@@ -84,92 +94,6 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
-def get_current_commit(repo_path: Path) -> str:
-    """Return the current HEAD commit id for the repo."""
-    result = subprocess.run(
-        ["git", "rev-parse", "HEAD"],
-        cwd=repo_path,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return result.stdout.strip()
-
-
-def has_uncommitted_changes(repo_path: Path) -> bool:
-    """Check if there are uncommitted changes (staged or unstaged)."""
-    result = subprocess.run(
-        ["git", "status", "--porcelain"],
-        cwd=repo_path,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return bool(result.stdout.strip())
-
-
-def check_clean_working_tree(repo_path: Path) -> None:
-    """Ensure working tree is clean before starting, prompting user if needed."""
-    if not has_uncommitted_changes(repo_path):
-        return
-
-    print("\n⚠️  Warning: Uncommitted changes detected in the repository.")
-    print("   This will interfere with commit detection during the run.")
-    print("\nOptions:")
-    print("  1. Abort and let me commit/stash changes first (recommended)")
-    print("  2. Continue anyway (commit detection may be unreliable)")
-
-    while True:
-        choice = input("\nSelect option (1 or 2): ").strip()
-        if choice == "1":
-            raise RunnerError("Aborted. Please commit or stash your changes, then run again.")
-        if choice == "2":
-            print("\n⚠️  Continuing with uncommitted changes. Commit detection may be unreliable.")
-            return
-        print("Invalid choice. Please enter 1 or 2.")
-
-
-def check_mcp_server_exists(provider: Provider, project_path: Path) -> None:
-    """Ensure spec-workflow MCP server is configured for the provider."""
-    mcp_cmd = provider.get_mcp_list_command()
-    command = mcp_cmd.to_list()
-
-    try:
-        result = subprocess.run(
-            command,
-            cwd=project_path,
-            capture_output=True,
-            text=True,
-            check=False,
-        )
-
-        if result.returncode != 0:
-            print(f"\n⚠️  Warning: Could not list MCP servers for {provider.get_provider_name()}.")
-            print(f"   Command failed: {' '.join(command)}")
-            print(f"   Error: {result.stderr.strip()}")
-            print("\n   Task tracking may not work properly without the spec-workflow MCP server.")
-            return
-
-        output = result.stdout.lower()
-        if "spec-workflow" not in output:
-            executable = provider.get_mcp_list_command().executable
-            raise RunnerError(
-                f"spec-workflow MCP server not found for {provider.get_provider_name()}.\n"
-                f"   The spec-workflow MCP server is required for automatic task tracking.\n"
-                f"   Please configure it by running: {executable} mcp\n"
-                f"   Or check your MCP server configuration."
-            )
-
-        print(f"✓ spec-workflow MCP server detected for {provider.get_provider_name()}")
-
-    except FileNotFoundError as err:
-        executable = provider.get_mcp_list_command().executable
-        raise RunnerError(
-            f"{executable} command not found.\n"
-            f"   Please ensure {provider.get_provider_name()} is installed and available in PATH."
-        ) from err
-
-
 def ensure_spec(project: Path, cfg: Config, spec_name: str | None) -> tuple[str, Path]:
     """Return the spec name and directory, optionally prompting the user."""
     specs = discover_specs(project, cfg)
@@ -189,7 +113,25 @@ def ensure_spec(project: Path, cfg: Config, spec_name: str | None) -> tuple[str,
 def _label_option(option: SpecOption) -> str:
     if isinstance(option, AllSpecsSentinel):
         return "All unfinished specs"
+    if isinstance(option, MultipleSpecsSentinel):
+        return "Multiple specs (custom order)"
     return option[0]
+
+
+def _parse_spec_indices(input_str: str, specs: list[tuple[str, Path]]) -> list[tuple[str, Path]]:
+    """Parse comma-separated indices and return selected specs in order."""
+    try:
+        indices = [int(idx.strip()) for idx in input_str.split(",")]
+    except ValueError:
+        raise RunnerError(f"Invalid index format: '{input_str}'. Use comma-separated numbers like '1,3,5'")
+
+    selected = []
+    for idx in indices:
+        if idx < 1 or idx > len(specs):
+            raise RunnerError(f"Index {idx} out of range (1-{len(specs)})")
+        selected.append(specs[idx - 1])
+
+    return selected
 
 
 def _choose_spec_or_all(
@@ -197,39 +139,95 @@ def _choose_spec_or_all(
     cfg: Config,
     spec_name: str | None,
 ) -> SpecOption:
-    """Return either a spec tuple or ALL_SPECS_SENTINEL."""
+    """Return either a spec tuple, ALL_SPECS_SENTINEL, or MultipleSpecsSentinel."""
     specs = discover_specs(project, cfg)
     if spec_name:
         if spec_name.lower() == "all":
             return ALL_SPECS_SENTINEL
+        # Check if it's comma-separated indices like "1,3,5"
+        if "," in spec_name:
+            selected_specs = _parse_spec_indices(spec_name, specs)
+            return MultipleSpecsSentinel(selected_specs)
+        # Single spec by name
         for candidate, path in specs:
             if candidate == spec_name:
                 return candidate, path
         raise RunnerError(f"Spec '{spec_name}' not found under {project}")
 
-    options: list[SpecOption] = [ALL_SPECS_SENTINEL, *specs]
-    return choose_option(f"Select spec within {project}", options, label=_label_option)
+    # Interactive selection
+    print(f"\nAvailable specs in {project}:")
+    for idx, (name, _) in enumerate(specs, start=1):
+        print(f"  {idx}. {name}")
+    print("\nOptions:")
+    print("  - Enter 'all' for all unfinished specs (sorted by creation time)")
+    print("  - Enter a single number (e.g., '3') for one spec")
+    print("  - Enter comma-separated numbers (e.g., '2,5,1') for custom order")
+    print("  - Enter spec name directly")
+
+    choice = input("\nYour choice: ").strip()
+
+    if choice.lower() == "all":
+        return ALL_SPECS_SENTINEL
+
+    # Check if it's comma-separated indices
+    if "," in choice:
+        selected_specs = _parse_spec_indices(choice, specs)
+        return MultipleSpecsSentinel(selected_specs)
+
+    # Check if it's a single index
+    try:
+        idx = int(choice)
+        if 1 <= idx <= len(specs):
+            return specs[idx - 1]
+        raise RunnerError(f"Index {idx} out of range (1-{len(specs)})")
+    except ValueError:
+        pass
+
+    # Try as spec name
+    for candidate, path in specs:
+        if candidate == choice:
+            return candidate, path
+
+    raise RunnerError(f"Invalid selection: '{choice}'")
 
 
-def list_unfinished_specs(project: Path, cfg: Config) -> list[tuple[str, Path]]:
-    """Return specs with unfinished tasks, sorted by directory creation time (oldest first)."""
-    unfinished_with_ctime: list[tuple[float, str, Path]] = []
-    for name, spec_path in discover_specs(project, cfg):
-        tasks_path = spec_path / cfg.tasks_filename
-        if not tasks_path.exists():
-            continue
-        stats = read_task_stats(tasks_path)
-        if stats.total == 0:
-            continue
-        if stats.done < stats.total:
-            ctime = spec_path.stat().st_ctime
-            unfinished_with_ctime.append((ctime, name, spec_path))
+def run_multiple_specs(
+    provider: Provider,
+    cfg: Config,
+    project: Path,
+    specs: list[tuple[str, Path]],
+    dry_run: bool,
+) -> None:
+    """Run multiple specs in the specified order."""
+    if dry_run:
+        print("\n[DRY-RUN MODE] Selected specs in order:")
+        print(f"{'='*90}")
+        print(f"{'#':<6}{'Spec Name':<40}{'Status':<25}{'Created'}")
+        print(f"{'-'*90}")
 
-    # Sort by creation time (oldest first)
-    unfinished_with_ctime.sort(key=lambda x: x[0])
+        for idx, (name, spec_path) in enumerate(specs, start=1):
+            tasks_path = spec_path / cfg.tasks_filename
+            if tasks_path.exists():
+                stats = read_task_stats(tasks_path)
+                ctime = spec_path.stat().st_ctime
+                created_date = datetime.fromtimestamp(ctime).strftime("%Y-%m-%d %H:%M")
+                status = f"{stats.done}/{stats.total} tasks ({stats.in_progress} in progress)"
+            else:
+                created_date = "N/A"
+                status = "No tasks.md found"
+            print(f"{idx:<6}{name:<40}{status:<25}{created_date}")
 
-    # Return without the timestamp
-    return [(name, spec_path) for _, name, spec_path in unfinished_with_ctime]
+        print(f"{'-'*90}")
+        print(f"Total: {len(specs)} spec(s) will be processed in this order\n")
+        return
+
+    print(f"\nRunning {len(specs)} specs in specified order...")
+    for idx, (spec_name, spec_path) in enumerate(specs, start=1):
+        print(f"\n{'='*90}")
+        print(f"Processing spec {idx}/{len(specs)}: '{spec_name}'")
+        print(f"{'='*90}")
+        run_loop(provider, cfg, project, spec_name, spec_path, dry_run)
+        print(f"✓ Completed spec '{spec_name}' ({idx}/{len(specs)})")
 
 
 def run_all_specs(
@@ -239,6 +237,11 @@ def run_all_specs(
     dry_run: bool,
 ) -> None:
     """Sequentially run provider for every unfinished spec until all complete."""
+    if dry_run:
+        print("\n[DRY-RUN MODE] Displaying spec queue without executing...")
+        display_spec_queue(project, cfg)
+        return
+
     print("\nRunning unfinished specs in sequence.")
     while True:
         unfinished = list_unfinished_specs(project, cfg)
@@ -248,9 +251,6 @@ def run_all_specs(
         spec_name, spec_path = unfinished[0]
         print(f"\n==> Processing spec '{spec_name}'")
         run_loop(provider, cfg, project, spec_name, spec_path, dry_run)
-        if dry_run:
-            print("Dry-run mode: processed the first unfinished spec only.")
-            return
 
 
 def ensure_project(cfg: Config, explicit_path: Path | None, refresh_cache: bool) -> Path:
@@ -319,24 +319,11 @@ def build_prompt(cfg: Config, spec_name: str, stats: TaskStats) -> str:
     return cfg.prompt_template.format(**context)
 
 
-def run_provider(
-    provider: Provider,
-    cfg: Config,
-    project_path: Path,
-    prompt: str,
-    dry_run: bool,
-    *,
-    spec_name: str,
-    iteration: int,
-    log_path: Path,
-) -> None:
-    """Execute the provider command and stream output into a log file."""
-    log_path.parent.mkdir(parents=True, exist_ok=True)
-    provider_cmd = provider.build_command(prompt, project_path, cfg.codex_config_overrides)
-    command = provider_cmd.to_list()
+def _build_log_header(iteration: int, spec_name: str, command: list[str], prompt: str) -> str:
+    """Build the log file header with metadata."""
     started = datetime.now(UTC).isoformat()
     formatted_command = " ".join(shlex.quote(part) for part in command)
-    header = textwrap.dedent(
+    return textwrap.dedent(
         f"""\
         # Iteration {iteration}
         # Started {started}
@@ -351,22 +338,23 @@ def run_provider(
         """
     )
 
-    def _print_and_log(message: str, handle: TextIO) -> None:
-        print(message, end="")
-        handle.write(message)
-        handle.flush()
 
-    if dry_run:
-        simulated = f"[dry-run] Would run: {formatted_command}\n"
-        with log_path.open("w", encoding="utf-8") as handle:
-            handle.write(header)
-            handle.write(simulated)
-            handle.write("# Exit Code\n0\n")
-        print(simulated.strip())
-        print(f"Saved log: {log_path}")
-        return
+def _write_dry_run_log(log_path: Path, header: str, command: str) -> None:
+    """Write a dry-run simulation to the log file."""
+    simulated = f"[dry-run] Would run: {command}\n"
+    with log_path.open("w", encoding="utf-8") as handle:
+        handle.write(header)
+        handle.write(simulated)
+        handle.write("# Exit Code\n0\n")
+    print(simulated.strip())
+    print(f"Saved log: {log_path}")
 
+
+def _execute_provider_command(command: list[str], project_path: Path, header: str, log_path: Path) -> None:
+    """Execute provider command and stream output to log."""
+    formatted_command = " ".join(shlex.quote(part) for part in command)
     print("\nRunning:", formatted_command)
+
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
 
@@ -383,13 +371,91 @@ def run_provider(
         assert proc.stdout is not None
         for line in iter(proc.stdout.readline, b""):
             decoded = line.decode("utf-8", errors="replace")
-            _print_and_log(decoded, handle)
+            print(decoded, end="")
+            handle.write(decoded)
+            handle.flush()
         proc.wait()
         handle.write(f"\n# Exit Code\n{proc.returncode}\n")
 
     if proc.returncode != 0:
         raise RunnerError("Provider command failed. See log for details.")
     print(f"Saved log: {log_path}")
+
+
+def run_provider(
+    provider: Provider,
+    cfg: Config,
+    project_path: Path,
+    prompt: str,
+    dry_run: bool,
+    *,
+    spec_name: str,
+    iteration: int,
+    log_path: Path,
+) -> None:
+    """Execute the provider command and stream output into a log file."""
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    provider_cmd = provider.build_command(prompt, project_path, cfg.codex_config_overrides)
+    command = provider_cmd.to_list()
+    header = _build_log_header(iteration, spec_name, command, prompt)
+    formatted_command = " ".join(shlex.quote(part) for part in command)
+
+    if dry_run:
+        _write_dry_run_log(log_path, header, formatted_command)
+        return
+
+    _execute_provider_command(command, project_path, header, log_path)
+
+
+def _display_dry_run_spec_status(spec_name: str, spec_path: Path, stats: TaskStats) -> None:
+    """Display dry-run status for a single spec."""
+    print(f"\n[DRY-RUN MODE] Spec: {spec_name}")
+    print(f"{'='*90}")
+    print(f"Status: {stats.summary()}")
+    print(f"Path: {spec_path}")
+    ctime = spec_path.stat().st_ctime
+    created_date = datetime.fromtimestamp(ctime).strftime("%Y-%m-%d %H:%M:%S")
+    print(f"Created: {created_date}")
+    print(f"{'='*90}")
+    if stats.done >= stats.total:
+        print("✓ All tasks complete. Nothing to run.")
+    else:
+        print(f"Would run provider to complete {stats.total - stats.done} remaining task(s).")
+
+
+def _check_commit_progress(
+    project_path: Path,
+    last_commit: str,
+    no_commit_streak: int,
+    cfg: Config,
+) -> tuple[str, int]:
+    """Check for new commits and update streak counter. Returns (new_last_commit, new_streak)."""
+    new_commit = get_current_commit(project_path)
+    if new_commit != last_commit:
+        print(f"Detected new commit: {new_commit}")
+        return new_commit, 0
+
+    no_commit_streak += 1
+    has_changes = has_uncommitted_changes(project_path)
+    if has_changes:
+        print(
+            f"⚠️  No new commit detected, but uncommitted changes exist! "
+            f"Streak: {no_commit_streak}/{cfg.no_commit_limit}"
+        )
+        print("   The AI may have created/modified files but didn't commit them.")
+        print("   Check 'git status' to see what changed.")
+    else:
+        print(f"No new commit detected. Streak: {no_commit_streak}/{cfg.no_commit_limit}")
+
+    if no_commit_streak >= cfg.no_commit_limit:
+        if has_changes:
+            raise RunnerError(
+                "Circuit breaker: reached consecutive no-commit limit. "
+                "Uncommitted changes exist - the AI is not committing as instructed!"
+            )
+        raise RunnerError("Circuit breaker: reached consecutive no-commit limit.")
+
+    return last_commit, no_commit_streak
 
 
 def run_loop(
@@ -404,6 +470,12 @@ def run_loop(
     tasks_path = spec_path / cfg.tasks_filename
     if not tasks_path.exists():
         raise RunnerError(f"tasks.md not found at {tasks_path}")
+    stats = read_task_stats(tasks_path)
+    if stats.total == 0:
+        raise RunnerError("No tasks detected in tasks.md.")
+    if dry_run:
+        _display_dry_run_spec_status(spec_name, spec_path, stats)
+        return
 
     no_commit_streak = 0
     iteration = 0
@@ -412,8 +484,6 @@ def run_loop(
 
     while True:
         stats = read_task_stats(tasks_path)
-        if stats.total == 0:
-            raise RunnerError("No tasks detected in tasks.md.")
         remaining = stats.total - stats.done
         print(f"\nCurrent status ({spec_name}): {stats.summary()}")
         if remaining <= 0:
@@ -433,34 +503,10 @@ def run_loop(
             iteration=iteration,
             log_path=log_path,
         )
-        if dry_run:
-            print("Dry-run mode: skipping commit checks and exiting after first iteration.")
-            return
 
-        new_commit = get_current_commit(project_path)
-        if new_commit != last_commit:
-            print(f"Detected new commit: {new_commit}")
-            no_commit_streak = 0
-            last_commit = new_commit
-        else:
-            no_commit_streak += 1
-            has_changes = has_uncommitted_changes(project_path)
-            if has_changes:
-                print(
-                    f"⚠️  No new commit detected, but uncommitted changes exist! "
-                    f"Streak: {no_commit_streak}/{cfg.no_commit_limit}"
-                )
-                print("   The AI may have created/modified files but didn't commit them.")
-                print("   Check 'git status' to see what changed.")
-            else:
-                print(f"No new commit detected. Streak: {no_commit_streak}/{cfg.no_commit_limit}")
-            if no_commit_streak >= cfg.no_commit_limit:
-                if has_changes:
-                    raise RunnerError(
-                        "Circuit breaker: reached consecutive no-commit limit. "
-                        "Uncommitted changes exist - the AI is not committing as instructed!"
-                    )
-                raise RunnerError("Circuit breaker: reached consecutive no-commit limit.")
+        last_commit, no_commit_streak = _check_commit_progress(
+            project_path, last_commit, no_commit_streak, cfg
+        )
 
 
 def main() -> int:
@@ -481,6 +527,8 @@ def main() -> int:
         selection = _choose_spec_or_all(project, cfg, args.spec)
         if isinstance(selection, AllSpecsSentinel):
             run_all_specs(provider, cfg, project, args.dry_run)
+        elif isinstance(selection, MultipleSpecsSentinel):
+            run_multiple_specs(provider, cfg, project, selection.specs, args.dry_run)
         else:
             spec_name, spec_path = selection
             run_loop(provider, cfg, project, spec_name, spec_path, args.dry_run)

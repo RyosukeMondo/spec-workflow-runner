@@ -5,13 +5,107 @@ from __future__ import annotations
 import json
 import os
 import re
+import subprocess
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TypeVar
+from typing import TYPE_CHECKING, TypeVar
+
+if TYPE_CHECKING:
+    from .providers import Provider
 
 T = TypeVar("T")
+
+
+class RunnerError(Exception):
+    """Raised when the run needs to abort early."""
+
+
+def get_current_commit(repo_path: Path) -> str:
+    """Return the current HEAD commit id for the repo."""
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=repo_path,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return result.stdout.strip()
+
+
+def has_uncommitted_changes(repo_path: Path) -> bool:
+    """Check if there are uncommitted changes (staged or unstaged)."""
+    result = subprocess.run(
+        ["git", "status", "--porcelain"],
+        cwd=repo_path,
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    return bool(result.stdout.strip())
+
+
+def check_clean_working_tree(repo_path: Path) -> None:
+    """Ensure working tree is clean before starting, prompting user if needed."""
+    if not has_uncommitted_changes(repo_path):
+        return
+
+    print("\n⚠️  Warning: Uncommitted changes detected in the repository.")
+    print("   This will interfere with commit detection during the run.")
+    print("\nOptions:")
+    print("  1. Abort and let me commit/stash changes first (recommended)")
+    print("  2. Continue anyway (commit detection may be unreliable)")
+
+    while True:
+        choice = input("\nSelect option (1 or 2): ").strip()
+        if choice == "1":
+            raise RunnerError("Aborted. Please commit or stash your changes, then run again.")
+        if choice == "2":
+            print("\n⚠️  Continuing with uncommitted changes. Commit detection may be unreliable.")
+            return
+        print("Invalid choice. Please enter 1 or 2.")
+
+
+def check_mcp_server_exists(provider: Provider, project_path: Path) -> None:
+    """Ensure spec-workflow MCP server is configured for the provider."""
+    mcp_cmd = provider.get_mcp_list_command()
+    command = mcp_cmd.to_list()
+
+    try:
+        result = subprocess.run(
+            command,
+            cwd=project_path,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        if result.returncode != 0:
+            print(f"\n⚠️  Warning: Could not list MCP servers for {provider.get_provider_name()}.")
+            print(f"   Command failed: {' '.join(command)}")
+            print(f"   Error: {result.stderr.strip()}")
+            print("\n   Task tracking may not work properly without the spec-workflow MCP server.")
+            return
+
+        output = result.stdout.lower()
+        if "spec-workflow" not in output:
+            executable = provider.get_mcp_list_command().executable
+            raise RunnerError(
+                f"spec-workflow MCP server not found for {provider.get_provider_name()}.\n"
+                f"   The spec-workflow MCP server is required for automatic task tracking.\n"
+                f"   Please configure it by running: {executable} mcp\n"
+                f"   Or check your MCP server configuration."
+            )
+
+        print(f"✓ spec-workflow MCP server detected for {provider.get_provider_name()}")
+
+    except FileNotFoundError as err:
+        executable = provider.get_mcp_list_command().executable
+        raise RunnerError(
+            f"{executable} command not found.\n"
+            f"   Please ensure {provider.get_provider_name()} is installed and available in PATH."
+        ) from err
 
 
 def _encode_override_value(value: object) -> str:
@@ -248,9 +342,99 @@ def read_task_stats(tasks_path: Path) -> TaskStats:
     return TaskStats(done=done, pending=pending, in_progress=in_progress)
 
 
+def list_unfinished_specs(project: Path, cfg: Config) -> list[tuple[str, Path]]:
+    """Return specs with unfinished tasks, sorted by directory creation time (oldest first)."""
+    unfinished_with_ctime: list[tuple[float, str, Path]] = []
+    for name, spec_path in discover_specs(project, cfg):
+        tasks_path = spec_path / cfg.tasks_filename
+        if not tasks_path.exists():
+            continue
+        stats = read_task_stats(tasks_path)
+        if stats.total == 0:
+            continue
+        if stats.done < stats.total:
+            ctime = spec_path.stat().st_ctime
+            unfinished_with_ctime.append((ctime, name, spec_path))
+
+    # Sort by creation time (oldest first)
+    unfinished_with_ctime.sort(key=lambda x: x[0])
+
+    # Return without the timestamp
+    return [(name, spec_path) for _, name, spec_path in unfinished_with_ctime]
+
+
+def display_spec_queue(project: Path, cfg: Config) -> None:
+    """Display all specs with indices, timestamps, and completion status."""
+    from datetime import datetime
+
+    # Get all specs first
+    all_specs = discover_specs(project, cfg)
+
+    # Build list with metadata
+    specs_with_metadata: list[tuple[int, str, Path, float, bool]] = []
+    for idx, (name, spec_path) in enumerate(all_specs, start=1):
+        tasks_path = spec_path / cfg.tasks_filename
+        ctime = spec_path.stat().st_ctime
+
+        if tasks_path.exists():
+            stats = read_task_stats(tasks_path)
+            has_work = stats.total > 0 and stats.done < stats.total
+        else:
+            has_work = False
+
+        specs_with_metadata.append((idx, name, spec_path, ctime, has_work))
+
+    # Sort by creation time (oldest first) but keep original indices
+    unfinished = [(idx, name, path, ctime) for idx, name, path, ctime, has_work
+                  in specs_with_metadata if has_work]
+    unfinished.sort(key=lambda x: x[3])  # Sort by ctime
+
+    if not unfinished:
+        print("\n✓ No unfinished specs found. All specs are complete!")
+        return
+
+    print(f"\n{'='*90}")
+    print(f"Unfinished Specs Queue (sorted by creation time, oldest first)")
+    print(f"{'='*90}")
+    print(f"{'#':<6}{'Spec Name':<40}{'Status':<25}{'Created'}")
+    print(f"{'-'*90}")
+
+    for idx, name, spec_path, ctime in unfinished:
+        tasks_path = spec_path / cfg.tasks_filename
+        stats = read_task_stats(tasks_path)
+        created_date = datetime.fromtimestamp(ctime).strftime("%Y-%m-%d %H:%M")
+        status = f"{stats.done}/{stats.total} tasks ({stats.in_progress} in progress)"
+        print(f"{idx:<6}{name:<40}{status:<25}{created_date}")
+
+    print(f"{'-'*90}")
+    print(f"Total: {len(unfinished)} unfinished spec(s)")
+    print(f"\nTip: Use indices like '1,3,5' to select multiple specs in custom order\n")
+
+
 def _is_filter_string(text: str) -> bool:
     """Check if text is a valid filter string (folder-safe characters)."""
     return bool(re.match(r"^[a-zA-Z_\-]+$", text))
+
+
+def _display_menu(title: str, filtered_options: Sequence[T], label: Callable[[T], str], current_filter: str) -> None:
+    """Display the menu with current filter."""
+    filter_info = f" [filter: '{current_filter}']" if current_filter else ""
+    print(f"\n{title}{filter_info}")
+    for idx, option in enumerate(filtered_options, start=1):
+        print(f"  {idx}. {label(option)}")
+    if not filtered_options:
+        print("  (no matches)")
+
+
+def _build_prompt(current_filter: str, allow_quit: bool) -> str:
+    """Build the interactive prompt string."""
+    prompt = "Select # or filter text"
+    if current_filter:
+        prompt += " (Enter to reset)"
+    if allow_quit:
+        prompt += " (q to quit)"
+    prompt += ": "
+    return prompt
 
 
 def choose_option(
@@ -274,21 +458,8 @@ def choose_option(
     filtered_options: Sequence[T] = options
 
     while True:
-        filter_info = f" [filter: '{current_filter}']" if current_filter else ""
-        print(f"\n{title}{filter_info}")
-        for idx, option in enumerate(filtered_options, start=1):
-            print(f"  {idx}. {label(option)}")
-
-        if not filtered_options:
-            print("  (no matches)")
-
-        prompt = "Select # or filter text"
-        if current_filter:
-            prompt += " (Enter to reset)"
-        if allow_quit:
-            prompt += " (q to quit)"
-        prompt += ": "
-        choice = input(prompt).strip()
+        _display_menu(title, filtered_options, label, current_filter)
+        choice = input(_build_prompt(current_filter, allow_quit)).strip()
 
         if allow_quit and choice.lower() in {"q", "quit"}:
             raise KeyboardInterrupt("User cancelled selection")
