@@ -11,7 +11,7 @@
   - _Requirements: R1, R6, Structure alignment_
   - _Prompt: Role: Python Developer with type systems expertise | Task: Create TUI package structure under src/spec_workflow_runner/tui/ with state models (ProjectState, SpecState, RunnerState, AppState, RunnerStatus enum) following design.md specifications with strict type annotations and JSON serialization | Restrictions: Use @dataclass decorator, all fields must have type hints, use Path for file paths, datetime for timestamps, RunnerStatus enum with 4 states, RunnerState needs to_dict/from_dict methods, follow structure.md naming conventions, add module docstrings | Success: Package structure created with __init__.py files, all state models defined with correct fields and types, RunnerState serializes to/from JSON, mypy --strict passes on state.py_
 
-- [ ] 2. Implement state file persistence and recovery
+- [x] 2. Implement state file persistence and recovery
   - File: src/spec_workflow_runner/tui/state.py (continue)
   - Create StatePersister class for reading/writing runner_state.json
   - Implement cache directory creation at ~/.cache/spec-workflow-runner/
