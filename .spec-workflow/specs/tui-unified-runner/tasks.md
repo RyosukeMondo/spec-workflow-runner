@@ -103,7 +103,7 @@
   - _Requirements: R4_
   - _Prompt: Role: Python Developer with file I/O expertise | Task: Extract LogFollower class from monitor.py into tui/views/log_viewer.py as LogViewer class, adapting it for TUI with auto-scroll toggle and configurable max lines following requirement R4 | Restrictions: Maintain offset-based file reading pattern from LogFollower (track file position), add auto_scroll boolean parameter to render_panel, use collections.deque with maxlen for line buffering (from config.tui_log_tail_lines), preserve ANSI color codes in logs when rendering, handle log file rotation (reset offset if file size < current offset), show "Waiting for logs..." if log_path is None or file doesn't exist, update_log_path method to switch log files | Success: LogViewer reads new log lines incrementally using offset, buffers last N lines in deque, auto_scroll parameter controls whether to show newest lines, handles file rotation gracefully (reset offset), preserves ANSI colors in Rich Text rendering, shows waiting message if no log file_
 
-- [ ] 10. Create HelpPanel and FooterBar renderers
+- [x] 10. Create HelpPanel and FooterBar renderers
   - Files: src/spec_workflow_runner/tui/views/help_panel.py, src/spec_workflow_runner/tui/views/footer_bar.py
   - Implement render_help_panel with keybinding reference table
   - Implement render_footer_bar with status info: active runners count, errors (truncated), keybindings hint
