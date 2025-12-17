@@ -34,7 +34,7 @@
   - _Requirements: R6, 90% coverage target for state.py_
   - _Prompt: Role: QA Engineer with pytest expertise | Task: Create comprehensive unit tests for state models in tests/tui/test_state.py testing dataclass initialization, RunnerState serialization, and StatePersister persistence with mocked file system following requirement R6 with 90% coverage target | Restrictions: Use pytest fixtures for setup, mock file system operations (open, Path.exists, Path.mkdir), test both success and error paths (corrupted JSON, missing directory, invalid PID, config hash mismatch), test serialization round-trips correctly, mock os.kill for PID checks, achieve 90% coverage for state.py | Success: All state models tested with correct field types, serialization round-trips successfully, StatePersister handles errors gracefully (corrupted JSON, missing files), PID validation works correctly, config hash invalidation tested, tests pass with 90%+ coverage of state.py_
 
-- [ ] 4. Implement RunnerManager for subprocess lifecycle
+- [x] 4. Implement RunnerManager for subprocess lifecycle
   - File: src/spec_workflow_runner/tui/runner_manager.py
   - Create RunnerManager class with __init__, start_runner, stop_runner, get_active_runners methods
   - Implement subprocess spawning with Popen (non-blocking with pipes)
