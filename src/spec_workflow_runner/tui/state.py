@@ -12,6 +12,7 @@ import logging
 import os
 import queue
 import threading
+import time
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
@@ -367,6 +368,11 @@ class StatePoller:
         self._thread: threading.Thread | None = None
         self._stop_event = threading.Event()
 
+        # Performance metrics tracking
+        self._poll_times: list[float] = []
+        self._poll_count = 0
+        self._metrics_log_interval = 10  # Log metrics every 10 cycles
+
     def _get_mtime(self, path: Path) -> float | None:
         """Get modification time of a file, returning None if file doesn't exist."""
         try:
@@ -469,7 +475,38 @@ class StatePoller:
 
         while not self._stop_event.is_set():
             try:
+                # Measure poll cycle time
+                start_time = time.perf_counter()
                 self._poll_cycle()
+                poll_duration_ms = (time.perf_counter() - start_time) * 1000
+
+                # Track timing for metrics
+                self._poll_times.append(poll_duration_ms)
+                self._poll_count += 1
+
+                # Log metrics periodically if debug logging enabled
+                if (
+                    logger.isEnabledFor(logging.DEBUG)
+                    and self._poll_count % self._metrics_log_interval == 0
+                    and self._poll_times
+                ):
+                    min_ms = min(self._poll_times)
+                    max_ms = max(self._poll_times)
+                    avg_ms = sum(self._poll_times) / len(self._poll_times)
+                    logger.debug(
+                        "StatePoller metrics",
+                        extra={
+                            "extra_context": {
+                                "poll_count": self._poll_count,
+                                "min_poll_ms": round(min_ms, 2),
+                                "max_poll_ms": round(max_ms, 2),
+                                "avg_poll_ms": round(avg_ms, 2),
+                            }
+                        },
+                    )
+                    # Reset metrics after logging
+                    self._poll_times.clear()
+
             except Exception as err:
                 # Catch all exceptions to prevent thread crash
                 logger.error(f"Error in poll cycle: {err}", exc_info=True)

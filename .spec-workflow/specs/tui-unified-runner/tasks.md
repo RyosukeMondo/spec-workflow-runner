@@ -191,7 +191,7 @@
   - _Requirements: R7, Structure alignment_
   - _Prompt: Role: DevOps Engineer | Task: Update pyproject.toml to add spec-workflow-tui CLI entry point and extend Config dataclass in utils.py to add TUI settings with defaults following requirement R7 and structure.md | Restrictions: Add to existing [project.scripts] section with format "spec-workflow-tui = spec_workflow_runner.tui.app:main", preserve existing entry points, add TUI fields to Config dataclass with type annotations (all int), use .get() with defaults in Config.from_dict (tui_refresh_seconds=2, tui_log_tail_lines=200, tui_min_terminal_cols=80, tui_min_terminal_rows=24), validate all TUI config values are positive integers (raise ValueError if not) | Success: pyproject.toml has spec-workflow-tui entry point, Config dataclass has TUI fields with correct types, defaults work when fields missing from config.json, validation raises ValueError for invalid values, CLI command available after pip install -e ._
 
-- [ ] 18. Implement structured logging for TUI operations
+- [x] 18. Implement structured logging for TUI operations
   - File: src/spec_workflow_runner/tui/app.py (enhance logging)
   - Configure JSON logging formatter for structured logs
   - Log TUI lifecycle events: tui_start, tui_shutdown, runner_start, runner_stop
