@@ -283,7 +283,7 @@
   - _Requirements: Autonomous implementation, metrics for feedback_
   - _Prompt: Role: DevOps Engineer with observability expertise | Task: Create metrics collection script in scripts/collect_metrics.py that measures TUI performance (startup, memory, poll latency) and outputs JSON report for tracking | Restrictions: Use subprocess to launch TUI in test mode (with mocked terminal and file system), measure startup time from process start to first render using time.perf_counter, measure memory usage using psutil.Process.memory_info().rss, measure poll latency by timing StatePoller poll cycles (average over 10 cycles), output JSON report with fields (timestamp ISO 8601, startup_ms, memory_mb, poll_latency_ms, cpu_percent_idle), compare metrics against thresholds from tech.md (startup < 500ms, memory < 50MB, poll_latency < 100ms, cpu < 5%), exit with code 1 if any threshold exceeded else 0, print summary to stdout | Success: Script runs TUI and measures all metrics accurately, outputs valid JSON report to stdout or file, compares against thresholds and exits non-zero on violations, can be integrated into CI pipeline for regression detection_
 
-- [ ] 27. Create pre-commit quality checks
+- [x] 27. Create pre-commit quality checks
   - File: .pre-commit-config.yaml
   - Configure pre-commit hooks: ruff (lint), black (format), mypy (types), pytest (fast tests)
   - Ensure code quality gates before commit

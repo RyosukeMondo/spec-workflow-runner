@@ -333,4 +333,28 @@ You can run the whole suite in one go via:
 ruff check src tests && black --check src tests && mypy src && pytest
 ```
 
-Feel free to script this (e.g., with `make`) as the project grows.
+### Pre-commit Hooks
+
+Pre-commit hooks automatically enforce code quality standards before each commit:
+
+**Setup (one time per developer):**
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+**What runs on every commit:**
+- `ruff` - Linting and auto-fixing issues
+- `black` - Code formatting
+- `mypy` - Type checking (strict mode on `src/`)
+- `pytest` - Fast tests (excludes tests marked as `slow`)
+- Standard checks (YAML/JSON/TOML syntax, merge conflicts, large files, trailing whitespace)
+
+**Manual run (all files):**
+```bash
+pre-commit run --all-files
+```
+
+The commit will be blocked if any check fails. Fix the reported issues and try again. The hooks typically complete in under 10 seconds for typical changes.
+
+**Note**: Pre-commit hooks are strongly recommended but optional. If you skip installation, the CI pipeline will still enforce these checks on all pull requests.
