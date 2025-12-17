@@ -223,7 +223,7 @@
   - _Requirements: All requirements (integration test), 80% overall coverage target_
   - _Prompt: Role: QA Automation Engineer with integration testing expertise | Task: Create integration tests in tests/tui/test_integration.py simulating complete TUI workflows (launch, navigate, start/stop runner) with mocked terminal and file system following all requirements and 80% coverage target | Restrictions: Mock terminal size (via get_terminal_size), mock keyboard input by directly calling KeybindingHandler.handle_key with key sequences, mock file system (Path.exists, Path.read_text, Path.stat) using pytest fixtures from tests/tui/fixtures/, mock subprocess.Popen for provider processes, inject StateUpdate objects to queue to simulate file changes, use AppState assertions to verify navigation (selected_project, selected_spec), verify RunnerManager.start_runner called with correct args, test error scenarios (invalid config, runner crash with non-zero exit, missing files), achieve 80% overall coverage across all tui/ modules | Success: Integration tests cover major workflows (launch to shutdown, navigate and select, start/stop/restart runner), state transitions verified via AppState assertions, runner interactions verified via RunnerManager mock calls, error scenarios tested (show errors in footer, log errors, continue running), 80%+ overall coverage of tui/ package_
 
-- [ ] 21. Create test fixtures and sample data
+- [x] 21. Create test fixtures and sample data
   - Directory: tests/tui/fixtures/
   - Create sample_tasks.md with mix of completed, pending, and in-progress tasks
   - Create sample_logs.txt with ANSI color codes
