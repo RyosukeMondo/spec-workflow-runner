@@ -112,7 +112,7 @@
   - _Requirements: R7, R8_
   - _Prompt: Role: UX Developer with terminal UI experience | Task: Create render_help_panel in tui/views/help_panel.py with keybinding reference table and render_footer_bar in tui/views/footer_bar.py with status indicators following requirements R7 and R8 | Restrictions: Help panel uses rich.table.Table with columns (Key, Action, Description) and rows grouped by category (Navigation: arrows/Enter/g/G//, Runner Control: s/x/r, View Control: l/L/u/a, Meta: ?/c/q), footer bar uses rich.text.Text showing active runner count (e.g., 2 runners active), current error message truncated to fit (use tui_utils.truncate_text), and hint like "Press ? for help" | Success: Help panel displays all keybindings in readable categorized table, footer bar shows accurate runner count, displays error messages (truncated if too long), shows help hint, both integrate cleanly into layout_
 
-- [ ] 11. Create TUI utils module with formatting helpers
+- [x] 11. Create TUI utils module with formatting helpers
   - File: src/spec_workflow_runner/tui/tui_utils.py
   - Implement format_duration function: seconds (float) to HH:MM:SS string
   - Implement truncate_text function: add ellipsis if text exceeds max length
