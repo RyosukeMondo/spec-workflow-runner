@@ -171,7 +171,7 @@
   - _Requirements: R7, R9, R10_
   - _Prompt: Role: DevOps Engineer with CLI development expertise | Task: Implement main() entry point in tui/app.py with argparse for flags, initialize logging, load config, and launch TUIApp following requirements R7, R9, R10 | Restrictions: Use argparse with --config (default ./config.json), --debug (boolean flag), --help arguments, configure logging with RotatingFileHandler to ~/.cache/spec-workflow-runner/tui.log (10MB max, 3 backups), create custom JSON formatter outputting (timestamp, level, event, context) fields, enable DEBUG level if --debug else INFO, handle config loading errors with clear message, create TUIApp and call run() in try/except/finally to ensure cleanup, register signal.signal handlers for SIGINT and SIGTERM calling shutdown method, return exit code (0 success, 1 error, 130 SIGINT) | Success: main() parses arguments correctly, logging initialized to tui.log in JSON format, config loads or shows clear error, TUIApp launches and runs, signal handlers registered for graceful shutdown, returns correct exit codes based on outcome_
 
-- [ ] 16. Implement graceful shutdown with runner cleanup
+- [x] 16. Implement graceful shutdown with runner cleanup
   - File: src/spec_workflow_runner/tui/app.py (add to TUIApp)
   - Handle SIGINT (Ctrl+C) and SIGTERM signals with shutdown method
   - Prompt user if active runners exist: "N runners active. Stop all and quit? (y/n/c)"
