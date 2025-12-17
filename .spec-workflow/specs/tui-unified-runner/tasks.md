@@ -1,0 +1,323 @@
+# Tasks Document
+
+- [x] 1. Create TUI package structure and state data models
+  - File: src/spec_workflow_runner/tui/__init__.py, src/spec_workflow_runner/tui/state.py
+  - Create directory structure: tui/, tui/views/ with __init__.py files
+  - Implement dataclasses: ProjectState, SpecState, RunnerState, AppState
+  - Implement enum: RunnerStatus with states (RUNNING, STOPPED, CRASHED, COMPLETED)
+  - Add JSON serialization methods to RunnerState (to_dict/from_dict)
+  - Purpose: Establish TUI package foundation with type-safe state containers
+  - _Leverage: utils.TaskStats, Python dataclasses, enum, existing src/ structure_
+  - _Requirements: R1, R6, Structure alignment_
+  - _Prompt: Role: Python Developer with type systems expertise | Task: Create TUI package structure under src/spec_workflow_runner/tui/ with state models (ProjectState, SpecState, RunnerState, AppState, RunnerStatus enum) following design.md specifications with strict type annotations and JSON serialization | Restrictions: Use @dataclass decorator, all fields must have type hints, use Path for file paths, datetime for timestamps, RunnerStatus enum with 4 states, RunnerState needs to_dict/from_dict methods, follow structure.md naming conventions, add module docstrings | Success: Package structure created with __init__.py files, all state models defined with correct fields and types, RunnerState serializes to/from JSON, mypy --strict passes on state.py_
+
+- [ ] 2. Implement state file persistence and recovery
+  - File: src/spec_workflow_runner/tui/state.py (continue)
+  - Create StatePersister class for reading/writing runner_state.json
+  - Implement cache directory creation at ~/.cache/spec-workflow-runner/
+  - Add config hash generation using hashlib for state invalidation
+  - Add restore logic to validate PIDs and clean up stale state entries
+  - Purpose: Persist runner state across TUI restarts with validation
+  - _Leverage: pathlib.Path, json, hashlib, os.kill for PID checks_
+  - _Requirements: R6_
+  - _Prompt: Role: Python Developer with file I/O and process management expertise | Task: Implement StatePersister class in tui/state.py for reading/writing runner_state.json with automatic cache directory creation, config hash validation, and PID liveness checking following requirement R6 | Restrictions: Use pathlib for paths, handle JSON decode errors gracefully (delete corrupted file and continue), create cache dir with parents=True, compute config hash from config.json SHA256, validate PIDs using os.kill(pid, 0), remove stale entries from state file, log warnings for orphaned processes | Success: StatePersister can persist and restore RunnerState list, handles corrupted JSON gracefully (deletes and continues), creates cache directory if missing, validates config hash matches current config, checks PIDs are still running and cleans up stale entries_
+
+- [ ] 3. Write state layer unit tests
+  - File: tests/tui/test_state.py
+  - Test dataclass initialization and field types for all state models
+  - Test RunnerState JSON serialization/deserialization round-trips
+  - Test StatePersister read/write with mocked file system
+  - Test config hash invalidation when config changes
+  - Test PID validation removes stale entries
+  - Purpose: Ensure state layer reliability and correctness
+  - _Leverage: pytest, unittest.mock, pytest fixtures_
+  - _Requirements: R6, 90% coverage target for state.py_
+  - _Prompt: Role: QA Engineer with pytest expertise | Task: Create comprehensive unit tests for state models in tests/tui/test_state.py testing dataclass initialization, RunnerState serialization, and StatePersister persistence with mocked file system following requirement R6 with 90% coverage target | Restrictions: Use pytest fixtures for setup, mock file system operations (open, Path.exists, Path.mkdir), test both success and error paths (corrupted JSON, missing directory, invalid PID, config hash mismatch), test serialization round-trips correctly, mock os.kill for PID checks, achieve 90% coverage for state.py | Success: All state models tested with correct field types, serialization round-trips successfully, StatePersister handles errors gracefully (corrupted JSON, missing files), PID validation works correctly, config hash invalidation tested, tests pass with 90%+ coverage of state.py_
+
+- [ ] 4. Implement RunnerManager for subprocess lifecycle
+  - File: src/spec_workflow_runner/tui/runner_manager.py
+  - Create RunnerManager class with __init__, start_runner, stop_runner, get_active_runners methods
+  - Implement subprocess spawning with Popen (non-blocking with pipes)
+  - Add PID tracking and process health checks
+  - Implement SIGTERM then SIGKILL escalation in stop_runner (5 second timeout)
+  - Integrate precondition checks: check_clean_working_tree, check_mcp_server_exists
+  - Add commit detection using git log to track commits since runner start
+  - Purpose: Manage provider subprocess lifecycle with validation and monitoring
+  - _Leverage: subprocess.Popen, providers.py (Provider, CodexProvider, ClaudeProvider), utils.check_clean_working_tree, utils.check_mcp_server_exists, utils.get_current_commit_
+  - _Requirements: R3, R4, R6, R10_
+  - _Prompt: Role: Backend Developer with subprocess management and Git expertise | Task: Create RunnerManager class in tui/runner_manager.py implementing start_runner, stop_runner, and commit detection following requirements R3, R4, R6, R10, using Popen for non-blocking execution and integrating existing validation from utils.py | Restrictions: Use Popen with pipes (stdout, stderr), check preconditions (clean working tree via utils.check_clean_working_tree, MCP servers via utils.check_mcp_server_exists) before starting, implement SIGTERM with 5s timeout then SIGKILL in stop_runner, generate UUID for runner IDs, persist state after start/stop using StatePersister, store baseline commit hash on start and detect new commits via git log baseline..HEAD, return RunnerState from start_runner | Success: RunnerManager can start provider subprocesses with all validations passing, stop them gracefully with signal escalation (SIGTERM then SIGKILL after timeout), track PIDs correctly, persists state to runner_state.json after operations, detects commits made since runner start, restore_runners method loads state on init and validates PIDs_
+
+- [ ] 5. Write RunnerManager unit tests
+  - File: tests/tui/test_runner_manager.py
+  - Test start_runner validates preconditions with mocked checks
+  - Test subprocess spawning and PID tracking with mocked Popen
+  - Test stop_runner sends SIGTERM and SIGKILL with correct timing
+  - Test restore_runners recovers valid state and cleans up stale entries
+  - Test commit detection with mocked git commands
+  - Purpose: Ensure subprocess safety and state recovery correctness
+  - _Leverage: pytest, unittest.mock.patch, pytest fixtures_
+  - _Requirements: R3, R4, R6, R10, 85% coverage target_
+  - _Prompt: Role: QA Engineer with subprocess testing expertise | Task: Create comprehensive tests for RunnerManager in tests/tui/test_runner_manager.py testing start/stop/restore workflows with mocked subprocesses and git commands following requirements R3, R4, R6, R10 with 85% coverage target | Restrictions: Mock subprocess.Popen and provider commands, mock git commands for commit detection (utils.get_current_commit, git log), mock precondition checks (check_clean_working_tree returns True, check_mcp_server_exists returns None), test signal escalation timing (SIGTERM then SIGKILL after 5s), test state persistence after operations using mocked StatePersister, test restore_runners with mix of valid/invalid PIDs, achieve 85% coverage | Success: All RunnerManager methods tested with mocks, subprocess spawning verified, signal handling with correct timing verified, state recovery tested with stale PID cleanup, commit detection tested with mocked git, edge cases covered (PID reused by different process, git errors), 85%+ coverage of runner_manager.py_
+
+- [ ] 6. Implement StatePoller for file system monitoring
+  - File: src/spec_workflow_runner/tui/state.py (add to existing)
+  - Create StatePoller class with background thread polling files (tasks.md, logs, runner_state.json)
+  - Implement mtime-based change detection for efficient polling
+  - Use queue.Queue to publish StateUpdate objects to main thread
+  - Add start/stop methods for thread lifecycle management
+  - Purpose: Monitor file system changes in background without blocking UI
+  - _Leverage: threading.Thread, queue.Queue, pathlib.Path.stat() for mtime_
+  - _Requirements: R4_
+  - _Prompt: Role: Backend Developer with threading and file I/O expertise | Task: Implement StatePoller class in tui/state.py that runs background thread polling files for changes using mtime checks and publishes updates via queue following requirement R4 | Restrictions: Use threading.Thread with daemon=True, poll at config.tui_refresh_seconds interval (default 2s), check mtime of tasks.md and latest log file in each spec, publish StateUpdate dataclass objects to queue.Queue (include project, spec, update_type, data), handle file read errors gracefully (log warning and continue), provide start() and stop() methods for thread lifecycle (use threading.Event for stop signal), poll_cycle should be private method | Success: StatePoller detects file changes via mtime comparison, publishes StateUpdate to queue when files change, runs in background daemon thread, stops gracefully when stop() called (threading.Event), handles file read errors without crashing thread, uses configured refresh interval_
+
+- [ ] 7. Implement TreeView renderer for project/spec hierarchy
+  - File: src/spec_workflow_runner/tui/views/tree_view.py
+  - Create render_tree function building Rich Tree from ProjectState list
+  - Add status badges: checkmark (green) for complete, play (yellow) for running, warning (red) for crashed
+  - Implement selection highlighting using [reverse] style
+  - Add filtering by project/spec name matching filter_text
+  - Purpose: Render hierarchical project/spec tree with visual status indicators
+  - _Leverage: rich.tree.Tree, rich.text.Text for styling_
+  - _Requirements: R1, R2_
+  - _Prompt: Role: Frontend Developer with Rich library expertise | Task: Create render_tree function in tui/views/tree_view.py that builds Rich Tree from ProjectState list with status badges and selection highlighting following requirements R1 and R2 | Restrictions: Use rich.tree.Tree for hierarchy, apply status badges (✓ green for all tasks done, ▶ yellow for runner active, ⚠ red for runner crashed), highlight selected node with [reverse] style, filter tree by matching project/spec names against filter_text (case-insensitive), show task ratio next to spec names (e.g., 3/10 tasks), show spec count next to project names (e.g., 5 specs), expand/collapse projects based on selected_path | Success: Tree renders correctly with all projects as root nodes and specs as children, badges display based on runner and task state, selection highlighting uses reverse style, filtering matches names correctly (case-insensitive), task ratios and counts displayed_
+
+- [ ] 8. Implement StatusPanel renderer for spec details
+  - File: src/spec_workflow_runner/tui/views/status_panel.py
+  - Create render_status_panel function building Rich Panel with task progress and runner info
+  - Add progress bar using rich.progress.Progress for task completion
+  - Display runner details: provider, model, duration (HH:MM:SS), PID, last commit (hash + message)
+  - Handle None spec case with helpful message
+  - Purpose: Show detailed status for selected spec with real-time info
+  - _Leverage: rich.panel.Panel, rich.progress.Progress, rich.table.Table, rich.text.Text_
+  - _Requirements: R4_
+  - _Prompt: Role: Frontend Developer with Rich dashboard experience | Task: Create render_status_panel function in tui/views/status_panel.py that displays spec task progress and runner details in a Rich Panel following requirement R4 | Restrictions: Use rich.panel.Panel for container, rich.progress.Progress for task progress bar (completed/total), rich.table.Table for metadata rows (Project, Spec, Total Tasks, Completed, In Progress, Pending), add runner section if runner is not None showing Provider/Model, Running Duration (format as HH:MM:SS), PID, Last Commit (hash and message if available), handle None spec by showing "Select a spec from the tree" message, use green border if all tasks done else yellow | Success: Panel displays all required info (project path, spec name, task counts with progress bar, runner details if active), handles None spec gracefully with helpful message, formats duration correctly as HH:MM:SS, shows commit info when available (hash and message), border color reflects completion status_
+
+- [ ] 9. Extract and adapt LogViewer from monitor.py
+  - File: src/spec_workflow_runner/tui/views/log_viewer.py
+  - Extract LogFollower class from monitor.py and adapt for TUI use
+  - Add auto_scroll toggle and scroll position tracking
+  - Implement log line buffering with configurable max lines from config
+  - Add render_panel method returning Rich Panel
+  - Purpose: Display log tail with auto-scroll and configurable buffer
+  - _Leverage: monitor.LogFollower pattern, rich.panel.Panel, rich.text.Text_
+  - _Requirements: R4_
+  - _Prompt: Role: Python Developer with file I/O expertise | Task: Extract LogFollower class from monitor.py into tui/views/log_viewer.py as LogViewer class, adapting it for TUI with auto-scroll toggle and configurable max lines following requirement R4 | Restrictions: Maintain offset-based file reading pattern from LogFollower (track file position), add auto_scroll boolean parameter to render_panel, use collections.deque with maxlen for line buffering (from config.tui_log_tail_lines), preserve ANSI color codes in logs when rendering, handle log file rotation (reset offset if file size < current offset), show "Waiting for logs..." if log_path is None or file doesn't exist, update_log_path method to switch log files | Success: LogViewer reads new log lines incrementally using offset, buffers last N lines in deque, auto_scroll parameter controls whether to show newest lines, handles file rotation gracefully (reset offset), preserves ANSI colors in Rich Text rendering, shows waiting message if no log file_
+
+- [ ] 10. Create HelpPanel and FooterBar renderers
+  - Files: src/spec_workflow_runner/tui/views/help_panel.py, src/spec_workflow_runner/tui/views/footer_bar.py
+  - Implement render_help_panel with keybinding reference table
+  - Implement render_footer_bar with status info: active runners count, errors (truncated), keybindings hint
+  - Purpose: Provide user guidance and status feedback in UI
+  - _Leverage: rich.panel.Panel, rich.table.Table, rich.text.Text_
+  - _Requirements: R7, R8_
+  - _Prompt: Role: UX Developer with terminal UI experience | Task: Create render_help_panel in tui/views/help_panel.py with keybinding reference table and render_footer_bar in tui/views/footer_bar.py with status indicators following requirements R7 and R8 | Restrictions: Help panel uses rich.table.Table with columns (Key, Action, Description) and rows grouped by category (Navigation: arrows/Enter/g/G//, Runner Control: s/x/r, View Control: l/L/u/a, Meta: ?/c/q), footer bar uses rich.text.Text showing active runner count (e.g., 2 runners active), current error message truncated to fit (use tui_utils.truncate_text), and hint like "Press ? for help" | Success: Help panel displays all keybindings in readable categorized table, footer bar shows accurate runner count, displays error messages (truncated if too long), shows help hint, both integrate cleanly into layout_
+
+- [ ] 11. Create TUI utils module with formatting helpers
+  - File: src/spec_workflow_runner/tui/tui_utils.py
+  - Implement format_duration function: seconds (float) to HH:MM:SS string
+  - Implement truncate_text function: add ellipsis if text exceeds max length
+  - Implement get_terminal_size function: return (cols, rows) tuple
+  - Implement get_status_badge function: return emoji and color for RunnerStatus
+  - Purpose: Provide reusable formatting utilities for views
+  - _Leverage: datetime.timedelta, shutil.get_terminal_size_
+  - _Requirements: R4, R7_
+  - _Prompt: Role: Python Developer | Task: Create utility functions in tui/tui_utils.py for formatting (format_duration, truncate_text, get_terminal_size, get_status_badge) following requirements R4 and R7 | Restrictions: format_duration takes seconds (float) returns string like "01:23:45" (handle 0s as "00:00:00", large durations up to days), truncate_text adds "..." suffix if text exceeds max_len (preserve max_len total length), get_terminal_size uses shutil.get_terminal_size and returns (cols, rows) tuple with fallback (80, 24), get_status_badge takes RunnerStatus and returns tuple (emoji, color) mapping (RUNNING: "▶", "yellow"), (STOPPED: "■", "dim"), (CRASHED: "⚠", "red"), (COMPLETED: "✓", "green"), no dependencies on other tui modules | Success: All utility functions work correctly, format_duration handles edge cases (0s returns "00:00:00", 3661s returns "01:01:01"), truncate_text preserves max_len including ellipsis, get_terminal_size uses shutil with fallback, get_status_badge maps all RunnerStatus values correctly_
+
+- [ ] 12. Write view component unit tests
+  - Files: tests/tui/test_tree_view.py, tests/tui/test_status_panel.py, tests/tui/test_log_viewer.py, tests/tui/test_tui_utils.py
+  - Test tree rendering with various project/spec states
+  - Test status panel formatting with runner active and inactive
+  - Test log viewer line buffering and auto-scroll behavior
+  - Test tui_utils formatting functions with edge cases
+  - Purpose: Ensure view correctness and prevent regressions
+  - _Leverage: pytest, snapshot testing with syrupy or similar_
+  - _Requirements: R1, R2, R4, R7, 70% coverage target for views_
+  - _Prompt: Role: QA Engineer with Rich UI testing expertise | Task: Create unit tests for view components in tests/tui/ testing render_tree, render_status_panel, LogViewer, and tui_utils with various state inputs following requirements R1, R2, R4, R7 with 70% coverage target | Restrictions: Mock state models (ProjectState, SpecState, RunnerState) with various states (empty projects, no selected spec, missing logs, crashed runners), test edge cases for each view, use snapshot testing to compare rendered Rich components if available (or verify key properties like tree node count, panel title, log line count), test filtering and highlighting in tree_view, test duration formatting edge cases in tui_utils (0s, large values), achieve 70% coverage for views/ | Success: All view functions tested with various inputs including edge cases, tree filtering and highlighting verified, status panel handles None spec and runner states, log viewer buffering and auto-scroll tested, tui_utils edge cases covered, 70%+ coverage of views/ directory_
+
+- [ ] 13. Implement KeybindingHandler for event routing
+  - File: src/spec_workflow_runner/tui/keybindings.py
+  - Create KeybindingHandler class mapping key presses to actions
+  - Implement navigation handlers: arrows (up/down), Enter (select/expand), g/G (jump), / (filter)
+  - Implement runner control handlers: s (start), x (stop), r (restart)
+  - Implement view control handlers: l (toggle logs), L (re-enable auto-scroll), u (unfinished only), a (all active)
+  - Implement meta handlers: ? (help), c (config), q (quit)
+  - Return action results (success/error messages)
+  - Purpose: Handle keyboard input and dispatch actions with validation
+  - _Leverage: AppState for navigation tracking, RunnerManager for runner control_
+  - _Requirements: R2, R3, R7_
+  - _Prompt: Role: Frontend Developer with event-driven architecture expertise | Task: Create KeybindingHandler class in tui/keybindings.py that maps all keyboard inputs to actions following requirements R2, R3, R7, updating AppState and calling RunnerManager methods with validation | Restrictions: Implement handle_key(key) method returning tuple (handled: bool, message: str or None), update AppState fields for navigation (selected_project, selected_spec, filter_mode, filter_text, show_unfinished_only, log_auto_scroll), call RunnerManager methods for start/stop/restart, validate actions before executing (e.g., can't start spec with no unfinished tasks, can't stop if not running), return descriptive messages for user feedback (e.g., "Started runner for spec X", "Error: No unfinished tasks"), handle arrow keys to navigate tree (update selected indices) | Success: All keybindings mapped correctly to handler methods, navigation updates AppState fields appropriately, runner controls call RunnerManager with validation, invalid actions return error messages without crashing, returns (True, message) for handled keys and (False, None) for unhandled_
+
+- [ ] 14. Implement main TUI application loop and layout
+  - File: src/spec_workflow_runner/tui/app.py
+  - Create TUIApp class with Rich Live for flicker-free updates
+  - Implement main event loop: poll keyboard input, process state updates from queue, re-render layout
+  - Build multi-panel layout: Left (tree), Center (status), Right (logs), Footer
+  - Integrate all components: StatePoller, RunnerManager, KeybindingHandler, all view renderers
+  - Handle terminal resize events
+  - Purpose: Orchestrate TUI application with real-time updates
+  - _Leverage: rich.live.Live, rich.layout.Layout, all view renderers, keyboard module or readchar for input_
+  - _Requirements: R1-R10 (all requirements integration)_
+  - _Prompt: Role: Full-stack Developer with Rich TUI expertise | Task: Create TUIApp class in tui/app.py implementing main event loop with Rich Live, integrating StatePoller, RunnerManager, KeybindingHandler, and all view components following all requirements R1-R10 | Restrictions: Use rich.live.Live for flicker-free updates, rich.layout.Layout for multi-panel layout (split: left panel 30% for tree, right panel 70% split vertically into top 60% status and bottom 40% logs, footer bar at bottom), poll keyboard input non-blocking (use select on stdin or keyboard library with timeout), process StateUpdate queue from StatePoller and update AppState, call view renderers with current AppState and RunnerManager state, call KeybindingHandler.handle_key for input, re-render only when state changes or key pressed, handle terminal resize by rebuilding layout, validate terminal size >= config min (default 80x24) and show warning in footer if too small | Success: TUI displays correctly with all four panels (tree, status, logs, footer), responds to keyboard input via KeybindingHandler, updates in real-time from StatePoller queue, layout adjusts to terminal size with minimum size warning, renders at reasonable frame rate without flickering_
+
+- [ ] 15. Add CLI entry point with argument parsing and logging
+  - File: src/spec_workflow_runner/tui/app.py (add main function)
+  - Implement main() function as CLI entry point
+  - Add argument parsing: --config (path to config.json), --debug (enable debug logging), --help
+  - Initialize structured JSON logging to ~/.cache/spec-workflow-runner/tui.log
+  - Load config, create TUIApp, start main loop with error handling
+  - Register signal handlers for SIGINT and SIGTERM
+  - Purpose: Provide runnable CLI command with proper initialization
+  - _Leverage: argparse, logging, utils.load_config, signal_
+  - _Requirements: R7, R9, R10_
+  - _Prompt: Role: DevOps Engineer with CLI development expertise | Task: Implement main() entry point in tui/app.py with argparse for flags, initialize logging, load config, and launch TUIApp following requirements R7, R9, R10 | Restrictions: Use argparse with --config (default ./config.json), --debug (boolean flag), --help arguments, configure logging with RotatingFileHandler to ~/.cache/spec-workflow-runner/tui.log (10MB max, 3 backups), create custom JSON formatter outputting (timestamp, level, event, context) fields, enable DEBUG level if --debug else INFO, handle config loading errors with clear message, create TUIApp and call run() in try/except/finally to ensure cleanup, register signal.signal handlers for SIGINT and SIGTERM calling shutdown method, return exit code (0 success, 1 error, 130 SIGINT) | Success: main() parses arguments correctly, logging initialized to tui.log in JSON format, config loads or shows clear error, TUIApp launches and runs, signal handlers registered for graceful shutdown, returns correct exit codes based on outcome_
+
+- [ ] 16. Implement graceful shutdown with runner cleanup
+  - File: src/spec_workflow_runner/tui/app.py (add to TUIApp)
+  - Handle SIGINT (Ctrl+C) and SIGTERM signals with shutdown method
+  - Prompt user if active runners exist: "N runners active. Stop all and quit? (y/n/c)"
+  - Stop runners with timeout (10 seconds), clean up state, restore terminal
+  - Purpose: Clean exit without orphaned processes
+  - _Leverage: signal module, RunnerManager.stop_runner, rich.prompt.Confirm_
+  - _Requirements: R10_
+  - _Prompt: Role: DevOps Engineer with signal handling expertise | Task: Implement graceful shutdown in TUIApp with signal handlers for SIGINT/SIGTERM, prompting user about active runners and cleaning up following requirement R10 | Restrictions: Add shutdown method to TUIApp, register in signal.signal handlers, on SIGINT check RunnerManager.get_active_runners, if active show prompt "N runners active. Stop all and quit? (y/n/c)" using Rich console input, y stops all runners with 10s timeout then quits, n quits without stopping (detach runners), c cancels shutdown and returns to TUI, on SIGTERM skip prompt and immediately stop all runners then quit, ensure StatePoller.stop() called to stop background thread, ensure rich.live.Live context exited cleanly (restores terminal), flush runner_state.json before exit, return appropriate exit code | Success: Ctrl+C shows prompt correctly, user choices work as expected (y stops all, n detaches, c cancels), runners stopped with proper timeout and signal escalation, terminal state restored on exit (cursor shown, clear screen), SIGTERM handled without prompt, all background threads stopped, state flushed to disk_
+
+- [ ] 17. Update pyproject.toml and extend Config for TUI
+  - Files: pyproject.toml, src/spec_workflow_runner/utils.py
+  - Add spec-workflow-tui to [project.scripts] section
+  - Extend Config dataclass with TUI fields: tui_refresh_seconds, tui_log_tail_lines, tui_min_terminal_cols, tui_min_terminal_rows
+  - Set defaults in Config.from_dict method
+  - Purpose: Register TUI CLI command and make behavior configurable
+  - _Leverage: Existing pyproject.toml structure, Config dataclass pattern_
+  - _Requirements: R7, Structure alignment_
+  - _Prompt: Role: DevOps Engineer | Task: Update pyproject.toml to add spec-workflow-tui CLI entry point and extend Config dataclass in utils.py to add TUI settings with defaults following requirement R7 and structure.md | Restrictions: Add to existing [project.scripts] section with format "spec-workflow-tui = spec_workflow_runner.tui.app:main", preserve existing entry points, add TUI fields to Config dataclass with type annotations (all int), use .get() with defaults in Config.from_dict (tui_refresh_seconds=2, tui_log_tail_lines=200, tui_min_terminal_cols=80, tui_min_terminal_rows=24), validate all TUI config values are positive integers (raise ValueError if not) | Success: pyproject.toml has spec-workflow-tui entry point, Config dataclass has TUI fields with correct types, defaults work when fields missing from config.json, validation raises ValueError for invalid values, CLI command available after pip install -e ._
+
+- [ ] 18. Implement structured logging for TUI operations
+  - File: src/spec_workflow_runner/tui/app.py (enhance logging)
+  - Configure JSON logging formatter for structured logs
+  - Log TUI lifecycle events: tui_start, tui_shutdown, runner_start, runner_stop
+  - Add error logging with stack traces and context
+  - Add debug logging for performance metrics (poll timings) if --debug flag
+  - Purpose: Enable debugging and performance monitoring
+  - _Leverage: Python logging module, json, logging.Formatter_
+  - _Requirements: R9_
+  - _Prompt: Role: DevOps Engineer with logging and observability expertise | Task: Implement structured JSON logging in tui/app.py for TUI lifecycle events and performance metrics following requirement R9 | Restrictions: Create custom JSONFormatter class extending logging.Formatter that outputs JSON with fields (timestamp ISO 8601, level, event, context dict), log key events (tui_start with config path, tui_shutdown with exit code, runner_start with project/spec/provider/pid, runner_stop with pid/exit_code, error with exception and stack trace), add debug logging for StatePoller poll timings (min/max/avg ms) if --debug flag, use logger.info/error/debug with extra dict for context, configure RotatingFileHandler with JSONFormatter | Success: Logs written in valid JSON format to tui.log, lifecycle events captured with relevant context, errors include exception info and stack traces, debug mode shows poll timings, logs are parsable JSON (one object per line), log rotation works at 10MB limit_
+
+- [ ] 19. Add comprehensive error handling across TUI modules
+  - Files: src/spec_workflow_runner/tui/exceptions.py (new), src/spec_workflow_runner/tui/app.py, src/spec_workflow_runner/tui/runner_manager.py, src/spec_workflow_runner/tui/state.py
+  - Create custom exception hierarchy: TUIError, StateError, RunnerError, ConfigError
+  - Wrap file operations in try/except with graceful degradation
+  - Display user-friendly error messages in footer
+  - Log detailed errors with context
+  - Purpose: Ensure TUI robustness and helpful error feedback
+  - _Leverage: Python exception handling, logging_
+  - _Requirements: R8_
+  - _Prompt: Role: Senior Developer with error handling expertise | Task: Add comprehensive error handling across TUI modules with custom exceptions and graceful degradation following requirement R8 | Restrictions: Create tui/exceptions.py with exception classes (TUIError base, StateError for state operations, RunnerError for subprocess issues, ConfigError for config problems), wrap all file I/O in try/except catching specific exceptions (FileNotFoundError, PermissionError, json.JSONDecodeError, OSError), display short error messages in footer bar using tui_utils.truncate_text with full error in logs, implement graceful degradation (show cached state if file read fails, disable features if preconditions fail), validate terminal size and warn in footer if below minimum, handle subprocess errors (Popen failures, signal errors) with clear messages | Success: Custom exceptions defined and used consistently, all file operations error-handled, errors displayed in footer with truncated messages, full errors logged with context, TUI continues running despite non-critical errors (shows cached data), terminal size validation warns user, subprocess errors caught and displayed clearly_
+
+- [ ] 20. Write integration tests for TUI workflows
+  - File: tests/tui/test_integration.py
+  - Test end-to-end workflow: launch TUI, navigate tree, start runner, monitor status, stop runner
+  - Mock terminal input (key presses) and file system (tasks.md, logs, config.json)
+  - Verify state transitions and UI updates
+  - Purpose: Validate complete TUI workflows and integration
+  - _Leverage: pytest, unittest.mock, fixtures from tests/tui/fixtures/_
+  - _Requirements: All requirements (integration test), 80% overall coverage target_
+  - _Prompt: Role: QA Automation Engineer with integration testing expertise | Task: Create integration tests in tests/tui/test_integration.py simulating complete TUI workflows (launch, navigate, start/stop runner) with mocked terminal and file system following all requirements and 80% coverage target | Restrictions: Mock terminal size (via get_terminal_size), mock keyboard input by directly calling KeybindingHandler.handle_key with key sequences, mock file system (Path.exists, Path.read_text, Path.stat) using pytest fixtures from tests/tui/fixtures/, mock subprocess.Popen for provider processes, inject StateUpdate objects to queue to simulate file changes, use AppState assertions to verify navigation (selected_project, selected_spec), verify RunnerManager.start_runner called with correct args, test error scenarios (invalid config, runner crash with non-zero exit, missing files), achieve 80% overall coverage across all tui/ modules | Success: Integration tests cover major workflows (launch to shutdown, navigate and select, start/stop/restart runner), state transitions verified via AppState assertions, runner interactions verified via RunnerManager mock calls, error scenarios tested (show errors in footer, log errors, continue running), 80%+ overall coverage of tui/ package_
+
+- [ ] 21. Create test fixtures and sample data
+  - Directory: tests/tui/fixtures/
+  - Create sample_tasks.md with mix of completed, pending, and in-progress tasks
+  - Create sample_logs.txt with ANSI color codes
+  - Create sample_config.json with all required fields plus TUI settings
+  - Create sample_runner_state.json with 2 runner entries (1 running, 1 stopped)
+  - Purpose: Provide reusable test data for all TUI tests
+  - _Leverage: Markdown checkbox format, ANSI escape codes_
+  - _Requirements: Testing support_
+  - _Prompt: Role: QA Engineer | Task: Create test fixtures in tests/tui/fixtures/ including sample tasks.md, logs, config.json, and runner_state.json for use in tests | Restrictions: sample_tasks.md has mix of [ ] pending, [x] completed, [-] in-progress tasks (at least 3 of each), sample_logs.txt has ANSI color codes (e.g., \033[32m for green), sample_config.json has all required fields from utils.Config plus TUI settings with valid values, sample_runner_state.json has 2 runners (1 with valid-looking PID and RUNNING status, 1 with STOPPED status), use realistic paths and data that exercise edge cases (long project names, special characters) | Success: Fixtures created in tests/tui/fixtures/, sample_tasks.md parseable by utils.read_task_stats, sample_logs.txt has preserved ANSI codes, sample_config.json loads successfully via utils.load_config, sample_runner_state.json deserializes via StatePersister, fixtures cover various states and edge cases_
+
+- [ ] 22. Add performance and stress tests
+  - File: tests/tui/test_performance.py
+  - Benchmark startup time with large project counts (100 projects, 50 specs each)
+  - Test concurrent runner management (5 active runners)
+  - Measure file polling overhead (CPU usage during idle)
+  - Purpose: Validate performance requirements from tech.md
+  - _Leverage: pytest-benchmark, time, psutil for CPU/memory measurement_
+  - _Requirements: Performance requirements (startup < 500ms, CPU < 5% idle)_
+  - _Prompt: Role: Performance Engineer | Task: Create performance tests in tests/tui/test_performance.py benchmarking startup time, concurrent runners, and polling overhead following tech.md performance requirements | Restrictions: Use pytest-benchmark for timing measurements, test TUIApp startup with 100 mocked projects each with 50 mocked specs (measure from config load to first render), assert startup < 500ms with cache hit, test RunnerManager with 5 concurrent active runners (start all, verify all running, stop all), use psutil to measure CPU percentage of StatePoller thread during idle (no file changes), assert CPU < 5% average over 10 seconds, mock file system to avoid real I/O, run with pytest-benchmark or --benchmark-only flag | Success: Startup benchmark consistently under 500ms with cached projects, 5 concurrent runners managed successfully without errors, CPU usage during idle polling measured < 5% average, benchmarks pass reliably across runs_
+
+- [ ] 23. Update README with TUI documentation
+  - File: README.md
+  - Add "TUI Mode" section documenting spec-workflow-tui command
+  - Document all keybindings in markdown table format
+  - Add configuration section for TUI settings
+  - Include usage examples and troubleshooting
+  - Purpose: Provide user documentation for TUI features
+  - _Leverage: Existing README structure_
+  - _Requirements: Documentation standards from structure.md_
+  - _Prompt: Role: Technical Writer | Task: Update README.md with comprehensive TUI documentation including usage, keybindings reference, configuration, and examples following structure.md documentation standards | Restrictions: Add new "TUI Mode" section after existing "Usage" section, document spec-workflow-tui command with all flags (--config, --debug, --help), create markdown table with all keybindings (columns: Key, Action, Description) grouped by category (Navigation, Runner Control, View, Meta), list all config.json TUI settings (tui_refresh_seconds, tui_log_tail_lines, tui_min_terminal_cols, tui_min_terminal_rows) with defaults and descriptions, include usage examples (basic launch, debug mode, custom config), add troubleshooting subsection (terminal too small, no projects found, config errors, orphaned runners), preserve all existing README sections | Success: README has complete TUI documentation section, keybindings table is clear and comprehensive, config settings explained with defaults, usage examples provided, troubleshooting helps users resolve common issues, existing README content preserved_
+
+- [ ] 24. Create comprehensive TUI usage guide
+  - File: docs/TUI_GUIDE.md
+  - Write detailed guide: getting started, navigation tutorial, workflow examples, advanced features
+  - Include common use cases with step-by-step instructions
+  - Add FAQ and troubleshooting section
+  - Purpose: Provide comprehensive user guide beyond README
+  - _Leverage: README TUI section as foundation_
+  - _Requirements: Documentation standards_
+  - _Prompt: Role: Technical Writer with user education expertise | Task: Create comprehensive TUI usage guide in docs/TUI_GUIDE.md covering getting started, workflows, advanced features, and troubleshooting | Restrictions: Structure with sections (Getting Started, Basic Navigation, Starting and Monitoring Runners, Managing Multiple Runners, Advanced Features, Configuration, FAQ, Troubleshooting), include step-by-step tutorials for common workflows (How to start a spec workflow, How to monitor multiple projects, How to recover from TUI crash), document all keybindings with context and examples, add ASCII diagrams or screenshots showing layout, write FAQ for common questions (What happens to runners if TUI crashes?, How do I see all active runners?, Can I run multiple TUIs?), troubleshooting section with solutions (terminal too small -> resize or adjust config, orphaned runners -> how to find and kill, config errors -> validate JSON syntax) | Success: Guide is comprehensive and beginner-friendly, workflows are step-by-step and actionable, all features documented with examples, FAQ addresses common user questions, troubleshooting provides clear solutions with commands_
+
+- [ ] 25. Document iteration workflow for rapid development
+  - File: docs/ITERATION.md
+  - Document rapid iteration process: run TUI, identify issue, add test, fix, verify
+  - Add debugging tips and common pitfalls
+  - Purpose: Enable fast feedback cycles for developers
+  - _Leverage: Structured logging, --debug flag_
+  - _Requirements: Ultra-speed iteration per user request_
+  - _Prompt: Role: Technical Writer and Senior Developer | Task: Create iteration workflow guide in docs/ITERATION.md documenting fast feedback cycles for TUI development following user's ultra-speed iteration requirement | Restrictions: Document workflow steps (1. Run spec-workflow-tui --debug, 2. Reproduce issue/test feature, 3. Check ~/.cache/spec-workflow-runner/tui.log for errors/debug info, 4. Write failing test in tests/tui/, 5. Fix code in src/spec_workflow_runner/tui/, 6. Run pytest tests/tui/ to verify, 7. Run scripts/collect_metrics.py to check performance), add debugging tips (use --debug for verbose logging, add console.print() for quick debug output, use breakpoint() for interactive debugging, check poll timings in debug logs), list common pitfalls with solutions (blocking I/O in main thread -> use background threads, forgetting to update AppState -> verify state changes in tests, race conditions in polling -> use threading.Lock for shared state, terminal state not restored -> ensure Live context exits cleanly) | Success: Document provides actionable workflow for iteration, debugging tips are practical and helpful, common pitfalls documented with clear solutions, examples show how to use debug output for diagnosis_
+
+- [ ] 26. Add metrics collection script
+  - File: scripts/collect_metrics.py
+  - Implement metrics script measuring: startup time, memory usage, poll latency, render time
+  - Output JSON report for tracking performance over time
+  - Purpose: Enable performance monitoring and regression detection
+  - _Leverage: pytest-benchmark results, psutil, time module_
+  - _Requirements: Autonomous implementation, metrics for feedback_
+  - _Prompt: Role: DevOps Engineer with observability expertise | Task: Create metrics collection script in scripts/collect_metrics.py that measures TUI performance (startup, memory, poll latency) and outputs JSON report for tracking | Restrictions: Use subprocess to launch TUI in test mode (with mocked terminal and file system), measure startup time from process start to first render using time.perf_counter, measure memory usage using psutil.Process.memory_info().rss, measure poll latency by timing StatePoller poll cycles (average over 10 cycles), output JSON report with fields (timestamp ISO 8601, startup_ms, memory_mb, poll_latency_ms, cpu_percent_idle), compare metrics against thresholds from tech.md (startup < 500ms, memory < 50MB, poll_latency < 100ms, cpu < 5%), exit with code 1 if any threshold exceeded else 0, print summary to stdout | Success: Script runs TUI and measures all metrics accurately, outputs valid JSON report to stdout or file, compares against thresholds and exits non-zero on violations, can be integrated into CI pipeline for regression detection_
+
+- [ ] 27. Create pre-commit quality checks
+  - File: .pre-commit-config.yaml
+  - Configure pre-commit hooks: ruff (lint), black (format), mypy (types), pytest (fast tests)
+  - Ensure code quality gates before commit
+  - Purpose: Enforce code quality standards automatically
+  - _Leverage: Existing ruff, black, mypy, pytest tools_
+  - _Requirements: CLAUDE.md code quality enforcement_
+  - _Prompt: Role: DevOps Engineer | Task: Create pre-commit configuration in .pre-commit-config.yaml that runs ruff, black, mypy, and fast pytest tests before allowing commits following CLAUDE.md quality standards | Restrictions: Use pre-commit framework (pre-commit-config.yaml), add hooks for ruff (check and fix), black (check mode), mypy (strict mode on src/), pytest (exclude tests marked as slow with -k "not slow"), configure to fail commit if any check fails, add installation instructions to README (pip install pre-commit, pre-commit install), ensure hooks run in under 10 seconds for typical changes, include in dev dependencies | Success: Pre-commit config created with all quality checks, hooks run automatically on git commit, commit fails if checks fail (lint errors, type errors, test failures), documented in README for contributor setup, runs quickly enough for good developer experience_
+
+- [ ] 28. Configure code coverage reporting
+  - File: pyproject.toml (extend pytest config), .coveragerc (new)
+  - Configure pytest-cov for coverage reporting
+  - Set minimum coverage thresholds: 80% overall, 90% for state.py and runner_manager.py
+  - Generate HTML coverage reports
+  - Purpose: Track and enforce test coverage standards
+  - _Leverage: pytest-cov plugin_
+  - _Requirements: CLAUDE.md 80% test coverage minimum_
+  - _Prompt: Role: QA Engineer | Task: Configure pytest-cov in pyproject.toml and .coveragerc for coverage reporting with minimum thresholds following CLAUDE.md 80% coverage requirement | Restrictions: Add pytest-cov to [project.optional-dependencies] dev list, extend [tool.pytest.ini_options] with --cov=src/spec_workflow_runner/tui --cov-report=html --cov-report=term --cov-report=term-missing --cov-fail-under=80, create .coveragerc with [report] section setting per-file thresholds (tui/state.py: 90%, tui/runner_manager.py: 90%), configure to exclude tests/ from coverage, generate htmlcov/ directory with HTML reports, add coverage badge to README using shields.io or similar | Success: Coverage measured on every test run (pytest automatically), fails if under 80% overall or 90% for critical modules (state.py, runner_manager.py), HTML reports generated in htmlcov/, terminal shows coverage summary with missing lines, coverage tracked and enforced_
+
+- [ ] 29. Set up CI pipeline for TUI
+  - File: .github/workflows/tui_ci.yml
+  - Configure GitHub Actions CI to run: lint, type check, tests, coverage, metrics check
+  - Run on Linux and macOS platforms
+  - Fail build if quality gates not met
+  - Purpose: Automate quality checks on every push/PR
+  - _Leverage: GitHub Actions_
+  - _Requirements: CLAUDE.md quality enforcement, cross-platform testing_
+  - _Prompt: Role: DevOps Engineer with CI/CD expertise | Task: Create CI pipeline configuration in .github/workflows/tui_ci.yml that runs all quality checks (lint, types, tests, coverage, metrics) following CLAUDE.md standards | Restrictions: Trigger on push to main and pull_request events, create matrix for os (ubuntu-latest, macos-latest) and python-version (3.11, 3.12), install Python and dependencies (pip install -e .[dev]), run checks in order (ruff check, black --check, mypy src, pytest with coverage), run scripts/collect_metrics.py and fail if thresholds exceeded, upload coverage reports to Codecov or similar, cache pip dependencies using actions/cache, fail workflow if any step fails | Success: CI workflow configured and triggers on pushes/PRs, runs on both Linux and macOS, all quality checks execute (lint, types, tests, coverage, metrics), build fails on violations (non-zero exit codes), coverage reports uploaded, pip caching speeds up runs_
+
+- [ ] 30. Final integration testing and polish
+  - Test TUI on multiple terminals: xterm, iTerm2, Alacritty
+  - Test on multiple platforms: Linux, macOS
+  - Fix layout issues, rendering bugs, race conditions
+  - Verify all requirements R1-R10 acceptance criteria are met
+  - Purpose: Ensure production readiness and quality
+  - _Leverage: Real terminal testing across environments_
+  - _Requirements: All requirements validation_
+  - _Prompt: Role: QA Lead and Senior Developer | Task: Perform final integration testing across terminals and platforms, fix all bugs, and verify all requirements R1-R10 acceptance criteria are met before release | Restrictions: Test on at least 3 terminals (xterm on Linux, iTerm2 or Terminal.app on macOS, Alacritty or kitty on either), test on both Linux and macOS platforms, test with various terminal sizes (minimum 80x24, maximum 200x60), test with different config values (refresh 0.5s and 10s, log lines 50 and 500), test edge cases (0 projects, 100 projects, corrupted runner_state.json, crashed runners with non-zero exit), verify every acceptance criteria in requirements R1-R10 is met (checklist approach), fix all discovered bugs (layout breaks, race conditions, rendering glitches, incorrect state transitions), conduct user acceptance testing if possible | Success: TUI works correctly on all tested terminals and platforms, no critical bugs (crashes, data loss, orphaned processes), all nice-to-have bugs documented as known issues, all requirements R1-R10 acceptance criteria verified and passing, edge cases handled gracefully, user feedback positive_
