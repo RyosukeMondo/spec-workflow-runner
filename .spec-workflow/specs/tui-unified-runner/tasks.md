@@ -47,7 +47,7 @@
   - _Requirements: R3, R4, R6, R10_
   - _Prompt: Role: Backend Developer with subprocess management and Git expertise | Task: Create RunnerManager class in tui/runner_manager.py implementing start_runner, stop_runner, and commit detection following requirements R3, R4, R6, R10, using Popen for non-blocking execution and integrating existing validation from utils.py | Restrictions: Use Popen with pipes (stdout, stderr), check preconditions (clean working tree via utils.check_clean_working_tree, MCP servers via utils.check_mcp_server_exists) before starting, implement SIGTERM with 5s timeout then SIGKILL in stop_runner, generate UUID for runner IDs, persist state after start/stop using StatePersister, store baseline commit hash on start and detect new commits via git log baseline..HEAD, return RunnerState from start_runner | Success: RunnerManager can start provider subprocesses with all validations passing, stop them gracefully with signal escalation (SIGTERM then SIGKILL after timeout), track PIDs correctly, persists state to runner_state.json after operations, detects commits made since runner start, restore_runners method loads state on init and validates PIDs_
 
-- [ ] 5. Write RunnerManager unit tests
+- [x] 5. Write RunnerManager unit tests
   - File: tests/tui/test_runner_manager.py
   - Test start_runner validates preconditions with mocked checks
   - Test subprocess spawning and PID tracking with mocked Popen
