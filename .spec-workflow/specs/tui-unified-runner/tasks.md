@@ -134,7 +134,7 @@
   - _Requirements: R1, R2, R4, R7, 70% coverage target for views_
   - _Prompt: Role: QA Engineer with Rich UI testing expertise | Task: Create unit tests for view components in tests/tui/ testing render_tree, render_status_panel, LogViewer, and tui_utils with various state inputs following requirements R1, R2, R4, R7 with 70% coverage target | Restrictions: Mock state models (ProjectState, SpecState, RunnerState) with various states (empty projects, no selected spec, missing logs, crashed runners), test edge cases for each view, use snapshot testing to compare rendered Rich components if available (or verify key properties like tree node count, panel title, log line count), test filtering and highlighting in tree_view, test duration formatting edge cases in tui_utils (0s, large values), achieve 70% coverage for views/ | Success: All view functions tested with various inputs including edge cases, tree filtering and highlighting verified, status panel handles None spec and runner states, log viewer buffering and auto-scroll tested, tui_utils edge cases covered, 70%+ coverage of views/ directory_
 
-- [ ] 13. Implement KeybindingHandler for event routing
+- [x] 13. Implement KeybindingHandler for event routing
   - File: src/spec_workflow_runner/tui/keybindings.py
   - Create KeybindingHandler class mapping key presses to actions
   - Implement navigation handlers: arrows (up/down), Enter (select/expand), g/G (jump), / (filter)
