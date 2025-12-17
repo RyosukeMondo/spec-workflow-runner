@@ -19,6 +19,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from .exceptions import StateError
+
 
 class RunnerStatus(Enum):
     """Status of a runner process."""

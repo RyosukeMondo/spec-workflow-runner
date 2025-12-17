@@ -21,6 +21,7 @@ from ..utils import (
     check_mcp_server_exists,
     get_current_commit,
 )
+from .exceptions import RunnerError
 from .state import RunnerState, RunnerStatus, StatePersister
 
 if TYPE_CHECKING:

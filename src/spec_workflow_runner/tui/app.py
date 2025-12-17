@@ -22,6 +22,7 @@ from rich.layout import Layout
 from rich.live import Live
 
 from ..utils import Config, discover_projects, discover_specs, load_config, read_task_stats
+from .exceptions import ConfigError, TUIError
 from .keybindings import KeybindingHandler
 from .runner_manager import RunnerManager
 from .state import AppState, ProjectState, SpecState, StatePoller, StateUpdate

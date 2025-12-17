@@ -202,7 +202,7 @@
   - _Requirements: R9_
   - _Prompt: Role: DevOps Engineer with logging and observability expertise | Task: Implement structured JSON logging in tui/app.py for TUI lifecycle events and performance metrics following requirement R9 | Restrictions: Create custom JSONFormatter class extending logging.Formatter that outputs JSON with fields (timestamp ISO 8601, level, event, context dict), log key events (tui_start with config path, tui_shutdown with exit code, runner_start with project/spec/provider/pid, runner_stop with pid/exit_code, error with exception and stack trace), add debug logging for StatePoller poll timings (min/max/avg ms) if --debug flag, use logger.info/error/debug with extra dict for context, configure RotatingFileHandler with JSONFormatter | Success: Logs written in valid JSON format to tui.log, lifecycle events captured with relevant context, errors include exception info and stack traces, debug mode shows poll timings, logs are parsable JSON (one object per line), log rotation works at 10MB limit_
 
-- [ ] 19. Add comprehensive error handling across TUI modules
+- [x] 19. Add comprehensive error handling across TUI modules
   - Files: src/spec_workflow_runner/tui/exceptions.py (new), src/spec_workflow_runner/tui/app.py, src/spec_workflow_runner/tui/runner_manager.py, src/spec_workflow_runner/tui/state.py
   - Create custom exception hierarchy: TUIError, StateError, RunnerError, ConfigError
   - Wrap file operations in try/except with graceful degradation
