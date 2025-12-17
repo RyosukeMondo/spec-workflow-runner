@@ -312,7 +312,7 @@
   - _Requirements: CLAUDE.md quality enforcement, cross-platform testing_
   - _Prompt: Role: DevOps Engineer with CI/CD expertise | Task: Create CI pipeline configuration in .github/workflows/tui_ci.yml that runs all quality checks (lint, types, tests, coverage, metrics) following CLAUDE.md standards | Restrictions: Trigger on push to main and pull_request events, create matrix for os (ubuntu-latest, macos-latest) and python-version (3.11, 3.12), install Python and dependencies (pip install -e .[dev]), run checks in order (ruff check, black --check, mypy src, pytest with coverage), run scripts/collect_metrics.py and fail if thresholds exceeded, upload coverage reports to Codecov or similar, cache pip dependencies using actions/cache, fail workflow if any step fails | Success: CI workflow configured and triggers on pushes/PRs, runs on both Linux and macOS, all quality checks execute (lint, types, tests, coverage, metrics), build fails on violations (non-zero exit codes), coverage reports uploaded, pip caching speeds up runs_
 
-- [ ] 30. Final integration testing and polish
+- [x] 30. Final integration testing and polish
   - Test TUI on multiple terminals: xterm, iTerm2, Alacritty
   - Test on multiple platforms: Linux, macOS
   - Fix layout issues, rendering bugs, race conditions
