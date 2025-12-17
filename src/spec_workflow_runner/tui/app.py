@@ -6,10 +6,15 @@ integrating StatePoller, RunnerManager, KeybindingHandler, and all view componen
 
 from __future__ import annotations
 
+import argparse
+import json
 import logging
+import logging.handlers
 import queue
 import select
+import signal
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 from rich.console import Console
@@ -466,3 +471,255 @@ class TUIApp:
         self.runner_manager.shutdown(stop_all=stop_all, timeout=timeout)
 
         logger.info("TUI shutdown complete")
+
+
+class JSONFormatter(logging.Formatter):
+    """Custom JSON formatter for structured logging."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        """Format log record as JSON.
+
+        Args:
+            record: Log record to format
+
+        Returns:
+            JSON-formatted log line
+        """
+        log_data = {
+            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc).isoformat(),
+            "level": record.levelname,
+            "event": record.getMessage(),
+            "context": {
+                "module": record.module,
+                "function": record.funcName,
+                "line": record.lineno,
+            },
+        }
+
+        # Add exception info if present
+        if record.exc_info:
+            log_data["exception"] = self.formatException(record.exc_info)
+
+        # Add extra context from record if present
+        if hasattr(record, "extra_context"):
+            log_data["context"].update(record.extra_context)
+
+        return json.dumps(log_data)
+
+
+def _setup_logging(log_file: Path, debug: bool) -> None:
+    """Setup structured JSON logging to file.
+
+    Args:
+        log_file: Path to log file
+        debug: Enable debug level logging
+    """
+    # Create log directory if needed
+    log_file.parent.mkdir(parents=True, exist_ok=True)
+
+    # Configure root logger
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG if debug else logging.INFO)
+
+    # Remove existing handlers
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+
+    # Create rotating file handler (10MB max, 3 backups)
+    file_handler = logging.handlers.RotatingFileHandler(
+        log_file,
+        maxBytes=10 * 1024 * 1024,  # 10MB
+        backupCount=3,
+        encoding="utf-8",
+    )
+    file_handler.setFormatter(JSONFormatter())
+    file_handler.setLevel(logging.DEBUG if debug else logging.INFO)
+
+    root_logger.addHandler(file_handler)
+
+    logger.info(
+        "Logging initialized",
+        extra={"extra_context": {"log_file": str(log_file), "debug": debug}},
+    )
+
+
+def _parse_args() -> argparse.Namespace:
+    """Parse command line arguments.
+
+    Returns:
+        Parsed arguments
+    """
+    parser = argparse.ArgumentParser(
+        prog="spec-workflow-tui",
+        description="Terminal UI for managing spec workflow runners",
+    )
+
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=Path("./config.json"),
+        help="Path to config.json (default: ./config.json)",
+    )
+
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug logging",
+    )
+
+    return parser.parse_args()
+
+
+# Global TUI app instance for signal handlers
+_app_instance: TUIApp | None = None
+
+
+def _signal_handler(signum: int, frame) -> None:
+    """Handle shutdown signals.
+
+    Args:
+        signum: Signal number
+        frame: Current stack frame
+    """
+    global _app_instance
+
+    if _app_instance is None:
+        sys.exit(130 if signum == signal.SIGINT else 1)
+
+    if signum == signal.SIGINT:
+        # SIGINT (Ctrl+C): Prompt user about active runners
+        logger.info("Received SIGINT, initiating graceful shutdown")
+        _app_instance.should_quit = True
+
+    elif signum == signal.SIGTERM:
+        # SIGTERM: Immediate shutdown, stop all runners
+        logger.info("Received SIGTERM, stopping all runners")
+        _app_instance.shutdown(stop_all=True, timeout=10)
+        sys.exit(0)
+
+
+def main() -> int:
+    """Main entry point for TUI application.
+
+    Returns:
+        Exit code (0=success, 1=error, 130=SIGINT)
+    """
+    global _app_instance
+
+    # Parse arguments
+    args = _parse_args()
+
+    # Setup logging
+    log_dir = Path.home() / ".cache" / "spec-workflow-runner"
+    log_file = log_dir / "tui.log"
+    _setup_logging(log_file, args.debug)
+
+    logger.info(
+        "TUI starting",
+        extra={"extra_context": {"config_path": str(args.config), "debug": args.debug}},
+    )
+
+    try:
+        # Load configuration
+        config_path = args.config.resolve()
+        if not config_path.exists():
+            console = Console()
+            console.print(f"[red]Error: Config file not found: {config_path}[/red]")
+            console.print("Create a config.json file or specify path with --config")
+            logger.error(
+                "Config file not found",
+                extra={"extra_context": {"config_path": str(config_path)}},
+            )
+            return 1
+
+        try:
+            config = load_config(config_path)
+            logger.info(
+                "Config loaded successfully",
+                extra={
+                    "extra_context": {
+                        "repos_root": str(config.repos_root),
+                        "cache_dir": str(config.cache_dir),
+                    }
+                },
+            )
+        except Exception as err:
+            console = Console()
+            console.print(f"[red]Error loading config: {err}[/red]")
+            logger.error(
+                "Failed to load config",
+                extra={"extra_context": {"error": str(err)}},
+                exc_info=True,
+            )
+            return 1
+
+        # Create TUI app
+        _app_instance = TUIApp(config, config_path)
+
+        # Register signal handlers
+        signal.signal(signal.SIGINT, _signal_handler)
+        signal.signal(signal.SIGTERM, _signal_handler)
+
+        # Run TUI
+        exit_code = _app_instance.run()
+
+        logger.info(
+            "TUI exited",
+            extra={"extra_context": {"exit_code": exit_code}},
+        )
+
+        return exit_code
+
+    except KeyboardInterrupt:
+        logger.info("TUI interrupted by user (KeyboardInterrupt)")
+        # Handle shutdown with prompt
+        if _app_instance:
+            active_runners = len(
+                [r for r in _app_instance.runner_manager.runners.values() if r.status.value == "running"]
+            )
+
+            if active_runners > 0:
+                console = Console()
+                console.print(
+                    f"\n[yellow]{active_runners} runner(s) active. "
+                    f"Stop all and quit? (y/n/c)[/yellow]"
+                )
+                response = input().strip().lower()
+
+                if response == "y":
+                    console.print("[yellow]Stopping all runners...[/yellow]")
+                    _app_instance.shutdown(stop_all=True, timeout=10)
+                    console.print("[green]All runners stopped.[/green]")
+                elif response == "n":
+                    console.print("[yellow]Leaving runners active.[/yellow]")
+                    _app_instance.shutdown(stop_all=False, timeout=0)
+                elif response == "c":
+                    console.print("[yellow]Cancelled. Returning to TUI...[/yellow]")
+                    # User cancelled - could restart TUI here, but for now just exit
+                    _app_instance.shutdown(stop_all=False, timeout=0)
+                else:
+                    console.print("[yellow]Invalid response. Leaving runners active.[/yellow]")
+                    _app_instance.shutdown(stop_all=False, timeout=0)
+            else:
+                _app_instance.shutdown(stop_all=False, timeout=0)
+
+        return 130
+
+    except Exception as err:
+        logger.error(
+            "TUI crashed with unhandled exception",
+            extra={"extra_context": {"error": str(err)}},
+            exc_info=True,
+        )
+        console = Console()
+        console.print(f"[red]Fatal error: {err}[/red]")
+        console.print(f"[dim]Check logs at: {log_file}[/dim]")
+        return 1
+
+    finally:
+        if _app_instance:
+            _app_instance.shutdown(stop_all=False, timeout=0)
+
+
+if __name__ == "__main__":
+    sys.exit(main())

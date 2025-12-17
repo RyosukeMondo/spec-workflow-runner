@@ -159,7 +159,7 @@
   - _Requirements: R1-R10 (all requirements integration)_
   - _Prompt: Role: Full-stack Developer with Rich TUI expertise | Task: Create TUIApp class in tui/app.py implementing main event loop with Rich Live, integrating StatePoller, RunnerManager, KeybindingHandler, and all view components following all requirements R1-R10 | Restrictions: Use rich.live.Live for flicker-free updates, rich.layout.Layout for multi-panel layout (split: left panel 30% for tree, right panel 70% split vertically into top 60% status and bottom 40% logs, footer bar at bottom), poll keyboard input non-blocking (use select on stdin or keyboard library with timeout), process StateUpdate queue from StatePoller and update AppState, call view renderers with current AppState and RunnerManager state, call KeybindingHandler.handle_key for input, re-render only when state changes or key pressed, handle terminal resize by rebuilding layout, validate terminal size >= config min (default 80x24) and show warning in footer if too small | Success: TUI displays correctly with all four panels (tree, status, logs, footer), responds to keyboard input via KeybindingHandler, updates in real-time from StatePoller queue, layout adjusts to terminal size with minimum size warning, renders at reasonable frame rate without flickering_
 
-- [ ] 15. Add CLI entry point with argument parsing and logging
+- [x] 15. Add CLI entry point with argument parsing and logging
   - File: src/spec_workflow_runner/tui/app.py (add main function)
   - Implement main() function as CLI entry point
   - Add argument parsing: --config (path to config.json), --debug (enable debug logging), --help
