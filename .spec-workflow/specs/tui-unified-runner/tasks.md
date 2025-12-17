@@ -265,7 +265,7 @@
   - _Requirements: Documentation standards_
   - _Prompt: Role: Technical Writer with user education expertise | Task: Create comprehensive TUI usage guide in docs/TUI_GUIDE.md covering getting started, workflows, advanced features, and troubleshooting | Restrictions: Structure with sections (Getting Started, Basic Navigation, Starting and Monitoring Runners, Managing Multiple Runners, Advanced Features, Configuration, FAQ, Troubleshooting), include step-by-step tutorials for common workflows (How to start a spec workflow, How to monitor multiple projects, How to recover from TUI crash), document all keybindings with context and examples, add ASCII diagrams or screenshots showing layout, write FAQ for common questions (What happens to runners if TUI crashes?, How do I see all active runners?, Can I run multiple TUIs?), troubleshooting section with solutions (terminal too small -> resize or adjust config, orphaned runners -> how to find and kill, config errors -> validate JSON syntax) | Success: Guide is comprehensive and beginner-friendly, workflows are step-by-step and actionable, all features documented with examples, FAQ addresses common user questions, troubleshooting provides clear solutions with commands_
 
-- [ ] 25. Document iteration workflow for rapid development
+- [x] 25. Document iteration workflow for rapid development
   - File: docs/ITERATION.md
   - Document rapid iteration process: run TUI, identify issue, add test, fix, verify
   - Add debugging tips and common pitfalls
