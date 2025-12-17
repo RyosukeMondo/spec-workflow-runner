@@ -147,7 +147,7 @@
   - _Requirements: R2, R3, R7_
   - _Prompt: Role: Frontend Developer with event-driven architecture expertise | Task: Create KeybindingHandler class in tui/keybindings.py that maps all keyboard inputs to actions following requirements R2, R3, R7, updating AppState and calling RunnerManager methods with validation | Restrictions: Implement handle_key(key) method returning tuple (handled: bool, message: str or None), update AppState fields for navigation (selected_project, selected_spec, filter_mode, filter_text, show_unfinished_only, log_auto_scroll), call RunnerManager methods for start/stop/restart, validate actions before executing (e.g., can't start spec with no unfinished tasks, can't stop if not running), return descriptive messages for user feedback (e.g., "Started runner for spec X", "Error: No unfinished tasks"), handle arrow keys to navigate tree (update selected indices) | Success: All keybindings mapped correctly to handler methods, navigation updates AppState fields appropriately, runner controls call RunnerManager with validation, invalid actions return error messages without crashing, returns (True, message) for handled keys and (False, None) for unhandled_
 
-- [ ] 14. Implement main TUI application loop and layout
+- [x] 14. Implement main TUI application loop and layout
   - File: src/spec_workflow_runner/tui/app.py
   - Create TUIApp class with Rich Live for flicker-free updates
   - Implement main event loop: poll keyboard input, process state updates from queue, re-render layout
