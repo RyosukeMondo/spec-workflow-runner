@@ -63,6 +63,151 @@ spec-workflow-run --project /path/to/repo --spec my-spec --provider claude
 Both commands expect to find a `config.json` in the working directory unless a different
 `--config` path is provided.
 
+## TUI Mode
+
+The `spec-workflow-tui` command provides an interactive terminal UI for managing and monitoring multiple spec workflows simultaneously.
+
+### Features
+
+- Real-time monitoring of multiple projects and specs
+- Start, stop, and restart runners with keyboard shortcuts
+- Live log tailing with auto-scroll
+- Task progress tracking with visual indicators
+- Status badges showing runner state (running, stopped, crashed, completed)
+- Multi-panel layout (project tree, status panel, log viewer, footer)
+- Filter and navigate hierarchical project/spec structure
+
+### Usage
+
+Launch the TUI from your project directory:
+
+```bash
+# Basic usage (uses ./config.json by default)
+spec-workflow-tui
+
+# Specify custom config path
+spec-workflow-tui --config /path/to/config.json
+
+# Enable debug logging
+spec-workflow-tui --debug
+
+# Show help
+spec-workflow-tui --help
+```
+
+The TUI expects a `config.json` in the current directory or the path specified by `--config`.
+
+### Keybindings
+
+The TUI uses vim-style keybindings for navigation:
+
+| Key | Action | Description |
+|-----|--------|-------------|
+| **Navigation** | | |
+| `↑` / `k` | Move up | Navigate up in the project/spec tree |
+| `↓` / `j` | Move down | Navigate down in the project/spec tree |
+| `Enter` | Select/Expand | Select spec or expand project |
+| `g` | Jump to top | Jump to the first project |
+| `G` | Jump to bottom | Jump to the last spec |
+| `/` | Filter mode | Enter filter mode to search specs |
+| **Runner Control** | | |
+| `s` | Start runner | Start a runner for the selected spec |
+| `x` | Stop runner | Stop the active runner for selected spec |
+| `r` | Restart runner | Restart the runner for selected spec |
+| **View Control** | | |
+| `l` | Toggle logs | Show/hide the log panel |
+| `L` | Re-enable auto-scroll | Re-enable auto-scrolling for logs |
+| `u` | Toggle unfinished | Show only specs with unfinished tasks |
+| `a` | Show all active | List all active runners across projects |
+| **Meta** | | |
+| `?` | Help | Show help panel with keybindings |
+| `c` | Config | Show configuration panel |
+| `q` | Quit | Exit the TUI (prompts if runners active) |
+
+### Configuration
+
+Add these optional settings to your `config.json` to customize TUI behavior:
+
+```json
+{
+  "tui_refresh_seconds": 2,
+  "tui_log_tail_lines": 200,
+  "tui_min_terminal_cols": 80,
+  "tui_min_terminal_rows": 24
+}
+```
+
+**TUI Settings:**
+
+- `tui_refresh_seconds` (default: `2`): How often to poll for file changes (in seconds)
+- `tui_log_tail_lines` (default: `200`): Maximum number of log lines to display in the log viewer
+- `tui_min_terminal_cols` (default: `80`): Minimum terminal width required
+- `tui_min_terminal_rows` (default: `24`): Minimum terminal height required
+
+All TUI settings must be positive integers. If your terminal is smaller than the minimum size, the TUI will show a warning in the footer.
+
+### Usage Examples
+
+**Monitor multiple projects:**
+```bash
+# Launch TUI and navigate to different projects
+spec-workflow-tui
+# Use ↑/↓ to navigate, Enter to expand projects
+# Press 'a' to see all active runners
+```
+
+**Start a workflow:**
+```bash
+# Navigate to a spec with unfinished tasks
+# Press 's' to start the runner
+# Press 'l' to toggle the log panel and watch progress
+```
+
+**Debug mode:**
+```bash
+# Enable detailed logging for troubleshooting
+spec-workflow-tui --debug
+# Logs are written to ~/.cache/spec-workflow-runner/tui.log
+```
+
+### Troubleshooting
+
+**Terminal too small:**
+- **Problem**: Warning message "Terminal too small" appears in footer
+- **Solution**: Resize your terminal window or adjust `tui_min_terminal_cols`/`tui_min_terminal_rows` in config.json
+
+**No projects found:**
+- **Problem**: TUI shows empty project tree
+- **Solution**: Verify your `repos_root` in config.json points to the correct directory containing spec-workflow projects
+
+**Config errors:**
+- **Problem**: TUI fails to start with config error
+- **Solution**: Validate your config.json syntax and ensure all required fields are present. Check the error message for specific issues.
+
+**Orphaned runners:**
+- **Problem**: Runner processes remain after TUI crash
+- **Solution**: The TUI tracks active runners in `~/.cache/spec-workflow-runner/runner_state.json`. Manually kill orphaned processes with `ps aux | grep spec-workflow-run` and `kill <PID>`, then restart the TUI to clean up state.
+
+**Logs not updating:**
+- **Problem**: Log panel shows old content
+- **Solution**: Press 'L' to re-enable auto-scroll. Check that the log file exists and is being written to.
+
+### Graceful Shutdown
+
+When you press `q` to quit, the TUI checks for active runners:
+
+- **Active runners present**: Prompts "N runners active. Stop all and quit? (y/n/c)"
+  - `y`: Stop all runners and quit
+  - `n`: Quit without stopping (detach runners)
+  - `c`: Cancel and return to TUI
+- **No active runners**: Quits immediately
+
+On SIGTERM (e.g., `kill <pid>`), the TUI stops all runners automatically and exits.
+
+### Logs
+
+The TUI writes structured JSON logs to `~/.cache/spec-workflow-runner/tui.log` with automatic rotation (10MB max, 3 backups). Use `--debug` for verbose logging including performance metrics.
+
 ### Project Discovery Cache
 
 To speed up project discovery, `spec-workflow-run` caches the list of projects found under `repos_root`. The cache:

@@ -244,7 +244,7 @@
   - _Requirements: Performance requirements (startup < 500ms, CPU < 5% idle)_
   - _Prompt: Role: Performance Engineer | Task: Create performance tests in tests/tui/test_performance.py benchmarking startup time, concurrent runners, and polling overhead following tech.md performance requirements | Restrictions: Use pytest-benchmark for timing measurements, test TUIApp startup with 100 mocked projects each with 50 mocked specs (measure from config load to first render), assert startup < 500ms with cache hit, test RunnerManager with 5 concurrent active runners (start all, verify all running, stop all), use psutil to measure CPU percentage of StatePoller thread during idle (no file changes), assert CPU < 5% average over 10 seconds, mock file system to avoid real I/O, run with pytest-benchmark or --benchmark-only flag | Success: Startup benchmark consistently under 500ms with cached projects, 5 concurrent runners managed successfully without errors, CPU usage during idle polling measured < 5% average, benchmarks pass reliably across runs_
 
-- [ ] 23. Update README with TUI documentation
+- [x] 23. Update README with TUI documentation
   - File: README.md
   - Add "TUI Mode" section documenting spec-workflow-tui command
   - Document all keybindings in markdown table format
