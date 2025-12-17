@@ -81,7 +81,7 @@
   - _Requirements: R1, R2_
   - _Prompt: Role: Frontend Developer with Rich library expertise | Task: Create render_tree function in tui/views/tree_view.py that builds Rich Tree from ProjectState list with status badges and selection highlighting following requirements R1 and R2 | Restrictions: Use rich.tree.Tree for hierarchy, apply status badges (✓ green for all tasks done, ▶ yellow for runner active, ⚠ red for runner crashed), highlight selected node with [reverse] style, filter tree by matching project/spec names against filter_text (case-insensitive), show task ratio next to spec names (e.g., 3/10 tasks), show spec count next to project names (e.g., 5 specs), expand/collapse projects based on selected_path | Success: Tree renders correctly with all projects as root nodes and specs as children, badges display based on runner and task state, selection highlighting uses reverse style, filtering matches names correctly (case-insensitive), task ratios and counts displayed_
 
-- [ ] 8. Implement StatusPanel renderer for spec details
+- [x] 8. Implement StatusPanel renderer for spec details
   - File: src/spec_workflow_runner/tui/views/status_panel.py
   - Create render_status_panel function building Rich Panel with task progress and runner info
   - Add progress bar using rich.progress.Progress for task completion
