@@ -92,7 +92,7 @@
   - _Requirements: R4_
   - _Prompt: Role: Frontend Developer with Rich dashboard experience | Task: Create render_status_panel function in tui/views/status_panel.py that displays spec task progress and runner details in a Rich Panel following requirement R4 | Restrictions: Use rich.panel.Panel for container, rich.progress.Progress for task progress bar (completed/total), rich.table.Table for metadata rows (Project, Spec, Total Tasks, Completed, In Progress, Pending), add runner section if runner is not None showing Provider/Model, Running Duration (format as HH:MM:SS), PID, Last Commit (hash and message if available), handle None spec by showing "Select a spec from the tree" message, use green border if all tasks done else yellow | Success: Panel displays all required info (project path, spec name, task counts with progress bar, runner details if active), handles None spec gracefully with helpful message, formats duration correctly as HH:MM:SS, shows commit info when available (hash and message), border color reflects completion status_
 
-- [ ] 9. Extract and adapt LogViewer from monitor.py
+- [x] 9. Extract and adapt LogViewer from monitor.py
   - File: src/spec_workflow_runner/tui/views/log_viewer.py
   - Extract LogFollower class from monitor.py and adapt for TUI use
   - Add auto_scroll toggle and scroll position tracking
