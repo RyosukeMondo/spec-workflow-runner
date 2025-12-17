@@ -255,7 +255,7 @@
   - _Requirements: Documentation standards from structure.md_
   - _Prompt: Role: Technical Writer | Task: Update README.md with comprehensive TUI documentation including usage, keybindings reference, configuration, and examples following structure.md documentation standards | Restrictions: Add new "TUI Mode" section after existing "Usage" section, document spec-workflow-tui command with all flags (--config, --debug, --help), create markdown table with all keybindings (columns: Key, Action, Description) grouped by category (Navigation, Runner Control, View, Meta), list all config.json TUI settings (tui_refresh_seconds, tui_log_tail_lines, tui_min_terminal_cols, tui_min_terminal_rows) with defaults and descriptions, include usage examples (basic launch, debug mode, custom config), add troubleshooting subsection (terminal too small, no projects found, config errors, orphaned runners), preserve all existing README sections | Success: README has complete TUI documentation section, keybindings table is clear and comprehensive, config settings explained with defaults, usage examples provided, troubleshooting helps users resolve common issues, existing README content preserved_
 
-- [ ] 24. Create comprehensive TUI usage guide
+- [x] 24. Create comprehensive TUI usage guide
   - File: docs/TUI_GUIDE.md
   - Write detailed guide: getting started, navigation tutorial, workflow examples, advanced features
   - Include common use cases with step-by-step instructions
