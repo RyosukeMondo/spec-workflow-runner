@@ -22,7 +22,7 @@
   - _Requirements: R6_
   - _Prompt: Role: Python Developer with file I/O and process management expertise | Task: Implement StatePersister class in tui/state.py for reading/writing runner_state.json with automatic cache directory creation, config hash validation, and PID liveness checking following requirement R6 | Restrictions: Use pathlib for paths, handle JSON decode errors gracefully (delete corrupted file and continue), create cache dir with parents=True, compute config hash from config.json SHA256, validate PIDs using os.kill(pid, 0), remove stale entries from state file, log warnings for orphaned processes | Success: StatePersister can persist and restore RunnerState list, handles corrupted JSON gracefully (deletes and continues), creates cache directory if missing, validates config hash matches current config, checks PIDs are still running and cleans up stale entries_
 
-- [ ] 3. Write state layer unit tests
+- [x] 3. Write state layer unit tests
   - File: tests/tui/test_state.py
   - Test dataclass initialization and field types for all state models
   - Test RunnerState JSON serialization/deserialization round-trips
