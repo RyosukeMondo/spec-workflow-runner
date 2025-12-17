@@ -274,7 +274,7 @@
   - _Requirements: Ultra-speed iteration per user request_
   - _Prompt: Role: Technical Writer and Senior Developer | Task: Create iteration workflow guide in docs/ITERATION.md documenting fast feedback cycles for TUI development following user's ultra-speed iteration requirement | Restrictions: Document workflow steps (1. Run spec-workflow-tui --debug, 2. Reproduce issue/test feature, 3. Check ~/.cache/spec-workflow-runner/tui.log for errors/debug info, 4. Write failing test in tests/tui/, 5. Fix code in src/spec_workflow_runner/tui/, 6. Run pytest tests/tui/ to verify, 7. Run scripts/collect_metrics.py to check performance), add debugging tips (use --debug for verbose logging, add console.print() for quick debug output, use breakpoint() for interactive debugging, check poll timings in debug logs), list common pitfalls with solutions (blocking I/O in main thread -> use background threads, forgetting to update AppState -> verify state changes in tests, race conditions in polling -> use threading.Lock for shared state, terminal state not restored -> ensure Live context exits cleanly) | Success: Document provides actionable workflow for iteration, debugging tips are practical and helpful, common pitfalls documented with clear solutions, examples show how to use debug output for diagnosis_
 
-- [ ] 26. Add metrics collection script
+- [x] 26. Add metrics collection script
   - File: scripts/collect_metrics.py
   - Implement metrics script measuring: startup time, memory usage, poll latency, render time
   - Output JSON report for tracking performance over time
