@@ -213,7 +213,7 @@
   - _Requirements: R8_
   - _Prompt: Role: Senior Developer with error handling expertise | Task: Add comprehensive error handling across TUI modules with custom exceptions and graceful degradation following requirement R8 | Restrictions: Create tui/exceptions.py with exception classes (TUIError base, StateError for state operations, RunnerError for subprocess issues, ConfigError for config problems), wrap all file I/O in try/except catching specific exceptions (FileNotFoundError, PermissionError, json.JSONDecodeError, OSError), display short error messages in footer bar using tui_utils.truncate_text with full error in logs, implement graceful degradation (show cached state if file read fails, disable features if preconditions fail), validate terminal size and warn in footer if below minimum, handle subprocess errors (Popen failures, signal errors) with clear messages | Success: Custom exceptions defined and used consistently, all file operations error-handled, errors displayed in footer with truncated messages, full errors logged with context, TUI continues running despite non-critical errors (shows cached data), terminal size validation warns user, subprocess errors caught and displayed clearly_
 
-- [ ] 20. Write integration tests for TUI workflows
+- [x] 20. Write integration tests for TUI workflows
   - File: tests/tui/test_integration.py
   - Test end-to-end workflow: launch TUI, navigate tree, start runner, monitor status, stop runner
   - Mock terminal input (key presses) and file system (tasks.md, logs, config.json)
