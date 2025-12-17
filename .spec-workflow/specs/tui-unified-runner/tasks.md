@@ -292,7 +292,7 @@
   - _Requirements: CLAUDE.md code quality enforcement_
   - _Prompt: Role: DevOps Engineer | Task: Create pre-commit configuration in .pre-commit-config.yaml that runs ruff, black, mypy, and fast pytest tests before allowing commits following CLAUDE.md quality standards | Restrictions: Use pre-commit framework (pre-commit-config.yaml), add hooks for ruff (check and fix), black (check mode), mypy (strict mode on src/), pytest (exclude tests marked as slow with -k "not slow"), configure to fail commit if any check fails, add installation instructions to README (pip install pre-commit, pre-commit install), ensure hooks run in under 10 seconds for typical changes, include in dev dependencies | Success: Pre-commit config created with all quality checks, hooks run automatically on git commit, commit fails if checks fail (lint errors, type errors, test failures), documented in README for contributor setup, runs quickly enough for good developer experience_
 
-- [ ] 28. Configure code coverage reporting
+- [x] 28. Configure code coverage reporting
   - File: pyproject.toml (extend pytest config), .coveragerc (new)
   - Configure pytest-cov for coverage reporting
   - Set minimum coverage thresholds: 80% overall, 90% for state.py and runner_manager.py

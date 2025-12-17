@@ -1,0 +1,30 @@
+# Coverage configuration for pytest-cov
+[run]
+source = src/spec_workflow_runner
+omit =
+    tests/*
+    */__pycache__/*
+    */site-packages/*
+
+[report]
+# Overall minimum coverage threshold is 80% (enforced via pytest --cov-fail-under=80)
+precision = 2
+show_missing = true
+skip_covered = false
+exclude_lines =
+    pragma: no cover
+    def __repr__
+    raise AssertionError
+    raise NotImplementedError
+    if __name__ == .__main__.:
+    if TYPE_CHECKING:
+    @abstractmethod
+
+# Per-file minimum coverage requirements for critical modules
+# These are enforced manually or via CI - pytest-cov doesn't support per-file thresholds natively
+# Critical modules requiring 90% coverage:
+# - src/spec_workflow_runner/tui/state.py
+# - src/spec_workflow_runner/tui/runner_manager.py
+
+[html]
+directory = htmlcov

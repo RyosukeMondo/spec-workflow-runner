@@ -358,3 +358,35 @@ pre-commit run --all-files
 The commit will be blocked if any check fails. Fix the reported issues and try again. The hooks typically complete in under 10 seconds for typical changes.
 
 **Note**: Pre-commit hooks are strongly recommended but optional. If you skip installation, the CI pipeline will still enforce these checks on all pull requests.
+
+### Code Coverage
+
+The project enforces minimum code coverage thresholds:
+
+**Overall coverage**: 80% minimum (enforced automatically by pytest)
+
+**Critical modules**: 90% minimum for:
+- `src/spec_workflow_runner/tui/state.py`
+- `src/spec_workflow_runner/tui/runner_manager.py`
+
+**Run tests with coverage:**
+```bash
+pytest
+```
+
+This generates:
+- Terminal report with missing lines
+- HTML report in `htmlcov/` directory (open `htmlcov/index.html` in browser)
+
+**Check per-file thresholds:**
+```bash
+python scripts/check_coverage.py
+```
+
+**View HTML coverage report:**
+```bash
+pytest && open htmlcov/index.html  # macOS
+pytest && xdg-open htmlcov/index.html  # Linux
+```
+
+The test suite will fail if overall coverage drops below 80%. Critical modules are checked separately via the `check_coverage.py` script.

@@ -51,5 +51,5 @@ pretty = true
 mypy_path = "src"
 
 [tool.pytest.ini_options]
-addopts = "-ra"
+addopts = "-ra --cov=src/spec_workflow_runner --cov-report=html --cov-report=term --cov-report=term-missing --cov-fail-under=80"
 testpaths = ["tests"]
