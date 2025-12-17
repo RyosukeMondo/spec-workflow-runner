@@ -234,7 +234,7 @@
   - _Requirements: Testing support_
   - _Prompt: Role: QA Engineer | Task: Create test fixtures in tests/tui/fixtures/ including sample tasks.md, logs, config.json, and runner_state.json for use in tests | Restrictions: sample_tasks.md has mix of [ ] pending, [x] completed, [-] in-progress tasks (at least 3 of each), sample_logs.txt has ANSI color codes (e.g., \033[32m for green), sample_config.json has all required fields from utils.Config plus TUI settings with valid values, sample_runner_state.json has 2 runners (1 with valid-looking PID and RUNNING status, 1 with STOPPED status), use realistic paths and data that exercise edge cases (long project names, special characters) | Success: Fixtures created in tests/tui/fixtures/, sample_tasks.md parseable by utils.read_task_stats, sample_logs.txt has preserved ANSI codes, sample_config.json loads successfully via utils.load_config, sample_runner_state.json deserializes via StatePersister, fixtures cover various states and edge cases_
 
-- [ ] 22. Add performance and stress tests
+- [x] 22. Add performance and stress tests
   - File: tests/tui/test_performance.py
   - Benchmark startup time with large project counts (100 projects, 50 specs each)
   - Test concurrent runner management (5 active runners)
