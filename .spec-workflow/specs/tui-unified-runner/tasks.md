@@ -70,7 +70,7 @@
   - _Requirements: R4_
   - _Prompt: Role: Backend Developer with threading and file I/O expertise | Task: Implement StatePoller class in tui/state.py that runs background thread polling files for changes using mtime checks and publishes updates via queue following requirement R4 | Restrictions: Use threading.Thread with daemon=True, poll at config.tui_refresh_seconds interval (default 2s), check mtime of tasks.md and latest log file in each spec, publish StateUpdate dataclass objects to queue.Queue (include project, spec, update_type, data), handle file read errors gracefully (log warning and continue), provide start() and stop() methods for thread lifecycle (use threading.Event for stop signal), poll_cycle should be private method | Success: StatePoller detects file changes via mtime comparison, publishes StateUpdate to queue when files change, runs in background daemon thread, stops gracefully when stop() called (threading.Event), handles file read errors without crashing thread, uses configured refresh interval_
 
-- [ ] 7. Implement TreeView renderer for project/spec hierarchy
+- [x] 7. Implement TreeView renderer for project/spec hierarchy
   - File: src/spec_workflow_runner/tui/views/tree_view.py
   - Create render_tree function building Rich Tree from ProjectState list
   - Add status badges: checkmark (green) for complete, play (yellow) for running, warning (red) for crashed
