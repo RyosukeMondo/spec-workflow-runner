@@ -59,7 +59,7 @@
   - _Requirements: R3, R4, R6, R10, 85% coverage target_
   - _Prompt: Role: QA Engineer with subprocess testing expertise | Task: Create comprehensive tests for RunnerManager in tests/tui/test_runner_manager.py testing start/stop/restore workflows with mocked subprocesses and git commands following requirements R3, R4, R6, R10 with 85% coverage target | Restrictions: Mock subprocess.Popen and provider commands, mock git commands for commit detection (utils.get_current_commit, git log), mock precondition checks (check_clean_working_tree returns True, check_mcp_server_exists returns None), test signal escalation timing (SIGTERM then SIGKILL after 5s), test state persistence after operations using mocked StatePersister, test restore_runners with mix of valid/invalid PIDs, achieve 85% coverage | Success: All RunnerManager methods tested with mocks, subprocess spawning verified, signal handling with correct timing verified, state recovery tested with stale PID cleanup, commit detection tested with mocked git, edge cases covered (PID reused by different process, git errors), 85%+ coverage of runner_manager.py_
 
-- [ ] 6. Implement StatePoller for file system monitoring
+- [x] 6. Implement StatePoller for file system monitoring
   - File: src/spec_workflow_runner/tui/state.py (add to existing)
   - Create StatePoller class with background thread polling files (tasks.md, logs, runner_state.json)
   - Implement mtime-based change detection for efficient polling
