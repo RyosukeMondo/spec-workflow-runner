@@ -181,7 +181,7 @@
   - _Requirements: R10_
   - _Prompt: Role: DevOps Engineer with signal handling expertise | Task: Implement graceful shutdown in TUIApp with signal handlers for SIGINT/SIGTERM, prompting user about active runners and cleaning up following requirement R10 | Restrictions: Add shutdown method to TUIApp, register in signal.signal handlers, on SIGINT check RunnerManager.get_active_runners, if active show prompt "N runners active. Stop all and quit? (y/n/c)" using Rich console input, y stops all runners with 10s timeout then quits, n quits without stopping (detach runners), c cancels shutdown and returns to TUI, on SIGTERM skip prompt and immediately stop all runners then quit, ensure StatePoller.stop() called to stop background thread, ensure rich.live.Live context exited cleanly (restores terminal), flush runner_state.json before exit, return appropriate exit code | Success: Ctrl+C shows prompt correctly, user choices work as expected (y stops all, n detaches, c cancels), runners stopped with proper timeout and signal escalation, terminal state restored on exit (cursor shown, clear screen), SIGTERM handled without prompt, all background threads stopped, state flushed to disk_
 
-- [ ] 17. Update pyproject.toml and extend Config for TUI
+- [x] 17. Update pyproject.toml and extend Config for TUI
   - Files: pyproject.toml, src/spec_workflow_runner/utils.py
   - Add spec-workflow-tui to [project.scripts] section
   - Extend Config dataclass with TUI fields: tui_refresh_seconds, tui_log_tail_lines, tui_min_terminal_cols, tui_min_terminal_rows

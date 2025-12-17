@@ -91,6 +91,9 @@ def check_mcp_server_exists(provider: Provider, project_path: Path) -> None:
         output = result.stdout.lower()
         if "spec-workflow" not in output:
             executable = provider.get_mcp_list_command().executable
+            print(f"\n🔍 DEBUG: MCP list output (first 300 chars):")
+            print(f"   {repr(result.stdout[:300])}")
+            print(f"   Lowercase contains 'spec-workflow': {'spec-workflow' in output}")
             raise RunnerError(
                 f"spec-workflow MCP server not found for {provider.get_provider_name()}.\n"
                 f"   The spec-workflow MCP server is required for automatic task tracking.\n"
@@ -138,6 +141,10 @@ class Config:
     cache_dir: Path
     cache_max_age_days: int
     codex_config_overrides: tuple[tuple[str, str], ...] = ()
+    tui_refresh_seconds: int = 2
+    tui_log_tail_lines: int = 200
+    tui_min_terminal_cols: int = 80
+    tui_min_terminal_rows: int = 24
 
     @classmethod
     def from_dict(cls, payload: dict) -> Config:
@@ -154,6 +161,25 @@ class Config:
             for key, value in overrides_raw.items():
                 overrides.append((str(key), _encode_override_value(value)))
 
+        # Parse and validate TUI config values
+        tui_refresh_seconds = int(payload.get("tui_refresh_seconds", 2))
+        tui_log_tail_lines = int(payload.get("tui_log_tail_lines", 200))
+        tui_min_terminal_cols = int(payload.get("tui_min_terminal_cols", 80))
+        tui_min_terminal_rows = int(payload.get("tui_min_terminal_rows", 24))
+
+        if tui_refresh_seconds <= 0:
+            raise ValueError(f"tui_refresh_seconds must be positive, got {tui_refresh_seconds}")
+        if tui_log_tail_lines <= 0:
+            raise ValueError(f"tui_log_tail_lines must be positive, got {tui_log_tail_lines}")
+        if tui_min_terminal_cols <= 0:
+            raise ValueError(
+                f"tui_min_terminal_cols must be positive, got {tui_min_terminal_cols}"
+            )
+        if tui_min_terminal_rows <= 0:
+            raise ValueError(
+                f"tui_min_terminal_rows must be positive, got {tui_min_terminal_rows}"
+            )
+
         return cls(
             repos_root=repos_root,
             spec_workflow_dir_name=payload["spec_workflow_dir_name"],
@@ -169,6 +195,10 @@ class Config:
             cache_dir=cache_dir,
             cache_max_age_days=int(payload.get("cache_max_age_days", 7)),
             codex_config_overrides=tuple(overrides),
+            tui_refresh_seconds=tui_refresh_seconds,
+            tui_log_tail_lines=tui_log_tail_lines,
+            tui_min_terminal_cols=tui_min_terminal_cols,
+            tui_min_terminal_rows=tui_min_terminal_rows,
         )
 
 
