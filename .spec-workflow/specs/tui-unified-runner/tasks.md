@@ -123,7 +123,7 @@
   - _Requirements: R4, R7_
   - _Prompt: Role: Python Developer | Task: Create utility functions in tui/tui_utils.py for formatting (format_duration, truncate_text, get_terminal_size, get_status_badge) following requirements R4 and R7 | Restrictions: format_duration takes seconds (float) returns string like "01:23:45" (handle 0s as "00:00:00", large durations up to days), truncate_text adds "..." suffix if text exceeds max_len (preserve max_len total length), get_terminal_size uses shutil.get_terminal_size and returns (cols, rows) tuple with fallback (80, 24), get_status_badge takes RunnerStatus and returns tuple (emoji, color) mapping (RUNNING: "▶", "yellow"), (STOPPED: "■", "dim"), (CRASHED: "⚠", "red"), (COMPLETED: "✓", "green"), no dependencies on other tui modules | Success: All utility functions work correctly, format_duration handles edge cases (0s returns "00:00:00", 3661s returns "01:01:01"), truncate_text preserves max_len including ellipsis, get_terminal_size uses shutil with fallback, get_status_badge maps all RunnerStatus values correctly_
 
-- [ ] 12. Write view component unit tests
+- [x] 12. Write view component unit tests
   - Files: tests/tui/test_tree_view.py, tests/tui/test_status_panel.py, tests/tui/test_log_viewer.py, tests/tui/test_tui_utils.py
   - Test tree rendering with various project/spec states
   - Test status panel formatting with runner active and inactive
