@@ -1,0 +1,33 @@
+{
+  "config_hash": "a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6q7r8s9t0",
+  "runners": [
+    {
+      "runner_id": "550e8400-e29b-41d4-a716-446655440000",
+      "project_path": "/home/user/projects/my-awesome-project",
+      "spec_name": "user-authentication",
+      "provider": "codex",
+      "model": "claude-sonnet-4",
+      "pid": 12345,
+      "status": "running",
+      "started_at": "2025-12-18T10:15:23.456789",
+      "baseline_commit": "abc1234567890def1234567890abcdef12345678",
+      "last_commit_hash": "def9876543210abc9876543210fedcba98765432",
+      "last_commit_message": "feat: add unit tests for data models with validation\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>",
+      "exit_code": null
+    },
+    {
+      "runner_id": "661f9511-f3ac-52e5-b827-557766551111",
+      "project_path": "/home/user/projects/another-project",
+      "spec_name": "api-integration",
+      "provider": "codex",
+      "model": "claude-sonnet-4",
+      "pid": 67890,
+      "status": "stopped",
+      "started_at": "2025-12-18T09:30:45.123456",
+      "baseline_commit": "fedcba9876543210fedcba9876543210fedcba98",
+      "last_commit_hash": "1234567890abcdef1234567890abcdef12345678",
+      "last_commit_message": "fix: correct API endpoint validation logic",
+      "exit_code": 0
+    }
+  ]
+}

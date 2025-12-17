@@ -1,0 +1,43 @@
+{
+  "repos_root": "~/projects",
+  "spec_workflow_dir_name": ".spec-workflow",
+  "specs_subdir": "specs",
+  "tasks_filename": "tasks.md",
+  "codex_command": [
+    "codex",
+    "--provider",
+    "anthropic",
+    "--model",
+    "claude-sonnet-4"
+  ],
+  "prompt_template": "Work on the single next task for spec {spec_name}. When you complete a logical unit of work, you MUST run 'git add' followed by 'git commit' with a clear message. DO NOT just stage files - you must actually commit them. DO NOT ask permission - just commit immediately when work is done. Make atomic commits for each semantic group of changes.",
+  "no_commit_limit": 3,
+  "log_dir_name": "Implementation Logs",
+  "log_file_template": "{timestamp}_{spec_name}.log",
+  "ignore_dirs": [
+    "node_modules",
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "dist",
+    "build",
+    ".mypy_cache",
+    ".pytest_cache",
+    "coverage",
+    ".coverage",
+    "htmlcov"
+  ],
+  "monitor_refresh_seconds": 5,
+  "cache_dir": "~/.cache/spec-workflow-runner",
+  "cache_max_age_days": 7,
+  "codex_config_overrides": {
+    "temperature": 0.7,
+    "max_tokens": 4096,
+    "top_p": 0.9
+  },
+  "tui_refresh_seconds": 2,
+  "tui_log_tail_lines": 200,
+  "tui_min_terminal_cols": 80,
+  "tui_min_terminal_rows": 24
+}
