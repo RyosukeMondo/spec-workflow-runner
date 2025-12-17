@@ -302,7 +302,7 @@
   - _Requirements: CLAUDE.md 80% test coverage minimum_
   - _Prompt: Role: QA Engineer | Task: Configure pytest-cov in pyproject.toml and .coveragerc for coverage reporting with minimum thresholds following CLAUDE.md 80% coverage requirement | Restrictions: Add pytest-cov to [project.optional-dependencies] dev list, extend [tool.pytest.ini_options] with --cov=src/spec_workflow_runner/tui --cov-report=html --cov-report=term --cov-report=term-missing --cov-fail-under=80, create .coveragerc with [report] section setting per-file thresholds (tui/state.py: 90%, tui/runner_manager.py: 90%), configure to exclude tests/ from coverage, generate htmlcov/ directory with HTML reports, add coverage badge to README using shields.io or similar | Success: Coverage measured on every test run (pytest automatically), fails if under 80% overall or 90% for critical modules (state.py, runner_manager.py), HTML reports generated in htmlcov/, terminal shows coverage summary with missing lines, coverage tracked and enforced_
 
-- [ ] 29. Set up CI pipeline for TUI
+- [x] 29. Set up CI pipeline for TUI
   - File: .github/workflows/tui_ci.yml
   - Configure GitHub Actions CI to run: lint, type check, tests, coverage, metrics check
   - Run on Linux and macOS platforms

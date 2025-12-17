@@ -390,3 +390,23 @@ pytest && xdg-open htmlcov/index.html  # Linux
 ```
 
 The test suite will fail if overall coverage drops below 80%. Critical modules are checked separately via the `check_coverage.py` script.
+
+### Continuous Integration
+
+The project uses GitHub Actions for automated quality checks on every push and pull request.
+
+**CI Pipeline runs:**
+- Lint checks (ruff)
+- Format checks (black)
+- Type checks (mypy)
+- Test suite with coverage (pytest)
+- Per-file coverage threshold checks
+- Performance metrics validation (on Linux + Python 3.12)
+
+**Tested on:**
+- Ubuntu Latest + macOS Latest
+- Python 3.11 and 3.12
+
+The CI workflow configuration is in `.github/workflows/tui_ci.yml`.
+
+Coverage reports are automatically uploaded to Codecov for tracking over time.
