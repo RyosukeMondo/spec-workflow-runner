@@ -226,9 +226,9 @@ def _display_diff(diff_result, console: Console) -> None:
     console.print("\n[bold]Proposed changes:[/bold]")
     console.print(diff_result.diff_text)
     console.print(
-        f"\n[dim]Changes: +{diff_result.changes_summary['added']} "
-        f"-{diff_result.changes_summary['removed']} "
-        f"~{diff_result.changes_summary['modified']}[/dim]\n"
+        f"\n[dim]Changes: +{diff_result.lines_added} "
+        f"-{diff_result.lines_removed} "
+        f"~{diff_result.lines_modified}[/dim]\n"
     )
 
 

@@ -44,18 +44,19 @@ def mock_config() -> Mock:
 
 
 @pytest.fixture
-def app_state_with_spec() -> AppState:
-    """Create app state with a selected spec."""
+def app_state_with_spec(tmp_path: Path) -> AppState:
+    """Create app state with a selected spec using tmp_path."""
+    project_path = tmp_path / "project"
     spec = SpecState(
         name="test-spec",
-        path=Path("/repos/project/.spec-workflow/specs/test-spec"),
+        path=project_path / ".spec-workflow" / "specs" / "test-spec",
         total_tasks=10,
         completed_tasks=5,
         in_progress_tasks=2,
         pending_tasks=3,
     )
     project = ProjectState(
-        path=Path("/repos/project"),
+        path=project_path,
         name="project",
         specs=[spec],
     )
@@ -100,14 +101,17 @@ class TestCLIIntegration:
         mock_fixer = Mock()
         fix_result = FixResult(
             success=True,
-            has_changes=True,
+            original_validation=ValidationResult(is_valid=False, issues=["Format error"]),
+            fixed_validation=ValidationResult(is_valid=True, issues=[]),
             fixed_content="# Fixed content",
-            validation_result=ValidationResult(is_valid=True, issues=[]),
             diff_result=DiffResult(
                 has_changes=True,
                 diff_text="diff output",
-                changes_summary={"added": 5, "removed": 3, "modified": 2},
+                lines_added=5,
+                lines_removed=3,
+                lines_modified=2,
             ),
+            write_result=None,
             error_message=None,
         )
         mock_fixer.fix_tasks_file.return_value = fix_result
@@ -116,6 +120,7 @@ class TestCLIIntegration:
         from spec_workflow_runner.task_fixer.file_writer import WriteResult
         write_result = WriteResult(
             success=True,
+            file_path=tasks_file,
             backup_path=tasks_file.with_suffix(".md.backup"),
             error_message=None,
         )
@@ -163,14 +168,17 @@ class TestCLIIntegration:
         mock_fixer = Mock()
         fix_result = FixResult(
             success=True,
-            has_changes=True,
+            original_validation=ValidationResult(is_valid=False, issues=["Format error"]),
+            fixed_validation=ValidationResult(is_valid=True, issues=[]),
             fixed_content="# Fixed content",
-            validation_result=ValidationResult(is_valid=True, issues=[]),
             diff_result=DiffResult(
                 has_changes=True,
                 diff_text="diff output",
-                changes_summary={"added": 5, "removed": 3, "modified": 2},
+                lines_added=5,
+                lines_removed=3,
+                lines_modified=2,
             ),
+            write_result=None,
             error_message=None,
         )
         mock_fixer.fix_tasks_file.return_value = fix_result
@@ -214,10 +222,11 @@ class TestCLIIntegration:
         mock_fixer = Mock()
         fix_result = FixResult(
             success=True,
-            has_changes=False,
-            fixed_content=valid_tasks_content,
-            validation_result=ValidationResult(is_valid=True, issues=[]),
+            original_validation=ValidationResult(is_valid=True, issues=[]),
+            fixed_validation=None,
+            fixed_content=None,
             diff_result=None,
+            write_result=None,
             error_message=None,
         )
         mock_fixer.fix_tasks_file.return_value = fix_result
@@ -306,10 +315,11 @@ class TestCLIIntegration:
         mock_fixer = Mock()
         fix_result = FixResult(
             success=False,
-            has_changes=False,
+            original_validation=ValidationResult(is_valid=False, issues=["Format error"]),
+            fixed_validation=None,
             fixed_content=None,
-            validation_result=None,
             diff_result=None,
+            write_result=None,
             error_message="Claude API error",
         )
         mock_fixer.fix_tasks_file.return_value = fix_result
@@ -325,8 +335,8 @@ class TestCLIIntegration:
 class TestTUIIntegration:
     """Integration tests for TUI F keybinding."""
 
-    @patch("spec_workflow_runner.tui.keybindings.create_task_fixer")
-    @patch("spec_workflow_runner.tui.keybindings.create_provider")
+    @patch("spec_workflow_runner.task_fixer.create_task_fixer")
+    @patch("spec_workflow_runner.providers.create_provider")
     def test_tui_fix_success(
         self,
         mock_create_provider: Mock,
@@ -354,14 +364,17 @@ class TestTUIIntegration:
         mock_fixer = Mock()
         fix_result = FixResult(
             success=True,
-            has_changes=True,
+            original_validation=ValidationResult(is_valid=False, issues=["Format error"]),
+            fixed_validation=ValidationResult(is_valid=True, issues=[]),
             fixed_content="# Fixed content",
-            validation_result=ValidationResult(is_valid=True, issues=[]),
             diff_result=DiffResult(
                 has_changes=True,
                 diff_text="diff output",
-                changes_summary={"added": 5, "removed": 3, "modified": 2},
+                lines_added=5,
+                lines_removed=3,
+                lines_modified=2,
             ),
+            write_result=None,
             error_message=None,
         )
         mock_fixer.fix_tasks_file.return_value = fix_result
@@ -369,6 +382,7 @@ class TestTUIIntegration:
         from spec_workflow_runner.task_fixer.file_writer import WriteResult
         write_result = WriteResult(
             success=True,
+            file_path=tasks_file,
             backup_path=tasks_file.with_suffix(".md.backup"),
             error_message=None,
         )
@@ -387,8 +401,8 @@ class TestTUIIntegration:
         mock_fixer.fix_tasks_file.assert_called_once()
         mock_fixer.apply_fix.assert_called_once()
 
-    @patch("spec_workflow_runner.tui.keybindings.create_task_fixer")
-    @patch("spec_workflow_runner.tui.keybindings.create_provider")
+    @patch("spec_workflow_runner.task_fixer.create_task_fixer")
+    @patch("spec_workflow_runner.providers.create_provider")
     def test_tui_fix_no_changes(
         self,
         mock_create_provider: Mock,
@@ -413,10 +427,11 @@ class TestTUIIntegration:
         mock_fixer = Mock()
         fix_result = FixResult(
             success=True,
-            has_changes=False,
-            fixed_content=valid_tasks_content,
-            validation_result=ValidationResult(is_valid=True, issues=[]),
+            original_validation=ValidationResult(is_valid=True, issues=[]),
+            fixed_validation=None,
+            fixed_content=None,
             diff_result=None,
+            write_result=None,
             error_message=None,
         )
         mock_fixer.fix_tasks_file.return_value = fix_result
@@ -455,7 +470,7 @@ class TestTUIIntegration:
         assert "Error" in message
         assert "No spec selected" in message
 
-    @patch("spec_workflow_runner.tui.keybindings.create_provider")
+    @patch("spec_workflow_runner.providers.create_provider")
     def test_tui_fix_tasks_file_not_found(
         self,
         mock_create_provider: Mock,
@@ -478,8 +493,8 @@ class TestTUIIntegration:
         assert "Error" in message
         assert "not found" in message
 
-    @patch("spec_workflow_runner.tui.keybindings.create_task_fixer")
-    @patch("spec_workflow_runner.tui.keybindings.create_provider")
+    @patch("spec_workflow_runner.task_fixer.create_task_fixer")
+    @patch("spec_workflow_runner.providers.create_provider")
     def test_tui_fix_error_during_fix(
         self,
         mock_create_provider: Mock,
@@ -504,10 +519,11 @@ class TestTUIIntegration:
         mock_fixer = Mock()
         fix_result = FixResult(
             success=False,
-            has_changes=False,
+            original_validation=ValidationResult(is_valid=False, issues=["Format error"]),
+            fixed_validation=None,
             fixed_content=None,
-            validation_result=None,
             diff_result=None,
+            write_result=None,
             error_message="Validation failed",
         )
         mock_fixer.fix_tasks_file.return_value = fix_result
@@ -524,8 +540,8 @@ class TestTUIIntegration:
         assert "Error" in message
         assert "Validation failed" in message
 
-    @patch("spec_workflow_runner.tui.keybindings.create_task_fixer")
-    @patch("spec_workflow_runner.tui.keybindings.create_provider")
+    @patch("spec_workflow_runner.task_fixer.create_task_fixer")
+    @patch("spec_workflow_runner.providers.create_provider")
     def test_tui_fix_write_error(
         self,
         mock_create_provider: Mock,
@@ -550,14 +566,17 @@ class TestTUIIntegration:
         mock_fixer = Mock()
         fix_result = FixResult(
             success=True,
-            has_changes=True,
+            original_validation=ValidationResult(is_valid=False, issues=["Format error"]),
+            fixed_validation=ValidationResult(is_valid=True, issues=[]),
             fixed_content="# Fixed content",
-            validation_result=ValidationResult(is_valid=True, issues=[]),
             diff_result=DiffResult(
                 has_changes=True,
                 diff_text="diff output",
-                changes_summary={"added": 5, "removed": 3, "modified": 2},
+                lines_added=5,
+                lines_removed=3,
+                lines_modified=2,
             ),
+            write_result=None,
             error_message=None,
         )
         mock_fixer.fix_tasks_file.return_value = fix_result
@@ -565,6 +584,7 @@ class TestTUIIntegration:
         from spec_workflow_runner.task_fixer.file_writer import WriteResult
         write_result = WriteResult(
             success=False,
+            file_path=tasks_file,
             backup_path=None,
             error_message="Permission denied",
         )
