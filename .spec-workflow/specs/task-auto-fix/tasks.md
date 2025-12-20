@@ -111,7 +111,7 @@
   - _Requirements: R2 (AI-Powered Format Correction), Testability_
   - _Prompt: Implement the task for spec task-auto-fix, first run spec-workflow-guide to get the workflow guide then implement the task: Role: QA Engineer with expertise in mocking and prompt validation | Task: Create unit tests for PromptBuilder in tests/task_fixer/test_prompt_builder.py covering requirement R2 with 85%+ coverage | Restrictions: Mock template file reading with unittest.mock, verify prompt structure without calling Claude, test lazy-loading behavior | Leverage: unittest.mock.patch for Path.read_text() | Success: Prompt structure validated, template included correctly, issues formatted properly, lazy-loading tested, 85%+ coverage_
 
-- [ ] 12. Create unit tests for diff generator and file writer
+- [x] 12. Create unit tests for diff generator and file writer
   - File: tests/task_fixer/test_diff_generator.py, tests/task_fixer/test_file_writer.py
   - Test generate_diff() with identical/different content, change counting
   - Test write_with_backup() with temp files, backup creation, atomic rename
