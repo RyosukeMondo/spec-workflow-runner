@@ -72,7 +72,7 @@
   - _Requirements: R5 (TUI Integration)_
   - _Prompt: Implement the task for spec task-auto-fix, first run spec-workflow-guide to get the workflow guide then implement the task: Role: UI Developer with expertise in TUI frameworks and event handling | Task: Add 'F' keybinding for auto-fix in src/spec_workflow_runner/tui/keybindings.py following requirement R5, implementing _handle_fix_tasks() using existing handler pattern | Restrictions: Must return tuple[bool, str | None], blocking execution (synchronous), validate spec selection before proceeding, use ClaudeProvider with model='sonnet' | Leverage: Existing _handle_start_runner() pattern for reference | Success: F key triggers auto-fix for selected spec, appropriate error messages for invalid states, status messages show diff summary, execution blocks TUI until complete_
 
-- [ ] 8. Add CLI flag for auto-fix
+- [x] 8. Add CLI flag for auto-fix
   - File: src/spec_workflow_runner/tui/cli.py
   - Add --fix SPEC_NAME argument to argument parser
   - Implement _handle_fix_command() function
