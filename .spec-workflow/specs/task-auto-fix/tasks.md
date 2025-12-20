@@ -61,7 +61,7 @@
   - _Requirements: R7 (Dependency Injection)_
   - _Prompt: Implement the task for spec task-auto-fix, first run spec-workflow-guide to get the workflow guide then implement the task: Role: API Designer with expertise in factory patterns and clean APIs | Task: Create factory function create_task_fixer() in src/spec_workflow_runner/task_fixer/__init__.py following requirement R7, instantiating all dependencies with sensible defaults | Restrictions: Template path must resolve correctly (.spec-workflow/templates/tasks-template.md), factory must work with minimal config, export only public API | Leverage: Path resolution patterns from existing config loading | Success: create_task_fixer() returns fully initialized TaskFixer, all dependencies created with correct defaults, public API is clean and minimal_
 
-- [ ] 7. Add TUI keybinding for auto-fix
+- [x] 7. Add TUI keybinding for auto-fix
   - File: src/spec_workflow_runner/tui/keybindings.py
   - Add 'F' keybinding handler in handle_key()
   - Implement _handle_fix_tasks() method

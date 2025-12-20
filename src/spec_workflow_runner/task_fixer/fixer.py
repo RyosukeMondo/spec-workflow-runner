@@ -22,6 +22,7 @@ class FixResult:
     fixed_validation: ValidationResult | None
     diff_result: DiffResult | None
     write_result: WriteResult | None
+    fixed_content: str | None = None
     error_message: str | None = None
 
     @property
@@ -91,6 +92,7 @@ class TaskFixer:
                 fixed_validation=None,
                 diff_result=None,
                 write_result=None,
+                fixed_content=None,
             )
 
         # Step 2: Read the malformed content
@@ -103,6 +105,7 @@ class TaskFixer:
                 fixed_validation=None,
                 diff_result=None,
                 write_result=None,
+                fixed_content=None,
                 error_message=f"Failed to read file: {err}",
             )
 
@@ -121,6 +124,7 @@ class TaskFixer:
                 fixed_validation=None,
                 diff_result=None,
                 write_result=None,
+                fixed_content=None,
                 error_message=f"Failed to build prompt: {err}",
             )
 
@@ -147,6 +151,7 @@ class TaskFixer:
                     fixed_validation=None,
                     diff_result=None,
                     write_result=None,
+                    fixed_content=None,
                     error_message=f"Claude command failed: {result.stderr}",
                 )
 
@@ -159,6 +164,7 @@ class TaskFixer:
                 fixed_validation=None,
                 diff_result=None,
                 write_result=None,
+                fixed_content=None,
                 error_message=f"Claude command timed out after {self._subprocess_timeout}s",
             )
         except Exception as err:
@@ -168,6 +174,7 @@ class TaskFixer:
                 fixed_validation=None,
                 diff_result=None,
                 write_result=None,
+                fixed_content=None,
                 error_message=f"Failed to execute Claude: {err}",
             )
 
@@ -184,6 +191,7 @@ class TaskFixer:
                 fixed_validation=None,
                 diff_result=None,
                 write_result=None,
+                fixed_content=None,
                 error_message=f"Failed to validate fixed content: {err}",
             )
         finally:
@@ -203,6 +211,7 @@ class TaskFixer:
             fixed_validation=fixed_validation,
             diff_result=diff_result,
             write_result=None,
+            fixed_content=fixed_content,
         )
 
     def apply_fix(self, file_path: Path, fixed_content: str) -> WriteResult:
