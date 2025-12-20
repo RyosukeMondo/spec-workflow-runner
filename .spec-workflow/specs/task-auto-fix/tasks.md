@@ -91,7 +91,7 @@
   - _Requirements: R5 (TUI Integration)_
   - _Prompt: Implement the task for spec task-auto-fix, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Technical Writer with knowledge of UI documentation | Task: Add F keybinding documentation to help panel in src/spec_workflow_runner/tui/views/help_panel.py following requirement R5 | Restrictions: Add to "Runner Control" section, follow existing format (key | action | description), use consistent terminology | Leverage: Existing table.add_row() pattern | Success: F keybinding documented clearly in help panel, appears in correct section, matches existing formatting style_
 
-- [ ] 10. Create unit tests for validator
+- [x] 10. Create unit tests for validator
   - File: tests/task_fixer/test_validator.py
   - Test validate_file() with malformed inputs (missing checkboxes, invalid IDs, bad numbering)
   - Test with valid tasks.md files
