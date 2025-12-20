@@ -40,7 +40,7 @@
   - _Requirements: R4 (Safe File Writing with Backup)_
   - _Prompt: Implement the task for spec task-auto-fix, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Systems Programmer with expertise in file I/O and atomic operations | Task: Create FileWriter class in src/spec_workflow_runner/task_fixer/file_writer.py following requirement R4, implementing atomic file writes with backup using temp file + rename pattern | Restrictions: Use frozen dataclass for WriteResult, backups must have .backup suffix (unique if exists), all file ops must handle errors gracefully | Leverage: pathlib.Path for file operations, shutil for atomic copy | Success: Writes are atomic (no partial writes), backups created before modification, restore_from_backup() works correctly, all error scenarios handled (permissions, disk full)_
 
-- [ ] 5. Create TaskFixer orchestrator with dependency injection
+- [x] 5. Create TaskFixer orchestrator with dependency injection
   - File: src/spec_workflow_runner/task_fixer/fixer.py
   - Create FixResult, TaskFixer classes
   - Implement fix_tasks_file() coordinating validation -> prompt -> Claude -> diff
