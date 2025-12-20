@@ -144,7 +144,7 @@
   - _Requirements: R5 (TUI Integration), R6 (CLI Integration), Testability_
   - _Prompt: Implement the task for spec task-auto-fix, first run spec-workflow-guide to get the workflow guide then implement the task: Role: QA Engineer specializing in integration and end-to-end testing | Task: Create integration tests in tests/task_fixer/test_integration.py covering requirements R5 and R6 with 80%+ coverage of integration paths | Restrictions: Mock subprocess calls to Claude, use test fixtures for tasks.md files, test both success and error paths, verify user-facing messages | Leverage: Existing TUI test patterns from tests/tui/, pytest.fixture for test data | Success: CLI workflow tested (flag parsing, diff display, confirmation), TUI workflow tested (keybinding, selection validation, messages), fixtures cover malformed/valid cases, 80%+ integration coverage_
 
-- [ ] 15. Create test fixtures
+- [x] 15. Create test fixtures
   - Files: tests/task_fixer/fixtures/malformed_tasks.md, valid_tasks.md
   - Create malformed_tasks.md with various format errors (missing checkboxes, invalid IDs, inconsistent numbering)
   - Create valid_tasks.md following template format exactly
