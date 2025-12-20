@@ -101,7 +101,7 @@
   - _Requirements: R1 (Format Validation), Testability_
   - _Prompt: Implement the task for spec task-auto-fix, first run spec-workflow-guide to get the workflow guide then implement the task: Role: QA Engineer specializing in pytest and validation testing | Task: Create comprehensive unit tests for TaskValidator in tests/task_fixer/test_validator.py covering requirement R1 with 90%+ coverage | Restrictions: Test both valid and invalid inputs, test edge cases, use parametrize for multiple scenarios, no file I/O (use in-memory content) | Leverage: pytest.mark.parametrize for test variations | Success: All validation scenarios tested, edge cases covered, 90%+ code coverage for validator.py, tests run quickly (<1s)_
 
-- [ ] 11. Create unit tests for prompt builder
+- [x] 11. Create unit tests for prompt builder
   - File: tests/task_fixer/test_prompt_builder.py
   - Test build_prompt() includes template, malformed content, issues
   - Test template lazy-loading (only loaded once)
