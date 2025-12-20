@@ -133,7 +133,7 @@
   - _Requirements: R2 (AI-Powered Format Correction), R7 (DI), Testability_
   - _Prompt: Implement the task for spec task-auto-fix, first run spec-workflow-guide to get the workflow guide then implement the task: Role: QA Engineer with expertise in integration testing and mocking frameworks | Task: Create unit tests for TaskFixer orchestrator in tests/task_fixer/test_fixer.py covering requirements R2 and R7 with 90%+ coverage | Restrictions: Mock ALL dependencies, test orchestration flow not component logic, verify correct error propagation, use MagicMock for subprocess | Leverage: unittest.mock.MagicMock, pytest.fixture for mock setup | Success: Orchestration flow tested end-to-end, error handling verified at each stage, skip logic tested, dependency injection validated, 90%+ coverage_
 
-- [ ] 14. Create integration tests for CLI and TUI
+- [x] 14. Create integration tests for CLI and TUI
   - File: tests/task_fixer/test_integration.py
   - Test CLI --fix flag with valid/invalid specs
   - Test TUI F keybinding with various selection states
