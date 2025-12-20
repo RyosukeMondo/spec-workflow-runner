@@ -30,7 +30,7 @@
   - _Requirements: R3 (Diff Preview and Confirmation)_
   - _Prompt: Implement the task for spec task-auto-fix, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Python Developer specializing in diff algorithms and text processing | Task: Create DiffGenerator class in src/spec_workflow_runner/task_fixer/diff_generator.py following requirement R3, using difflib.unified_diff() to generate diffs with context lines and change summaries | Restrictions: Use frozen dataclass for DiffResult, handle identical content gracefully (no changes), default 3 context lines | Leverage: difflib.unified_diff | Success: Diffs correctly show additions/deletions/modifications, changes_summary counts accurate, has_changes flag correct, tested with various input combinations_
 
-- [ ] 4. Create file writer with atomic operations
+- [x] 4. Create file writer with atomic operations
   - File: src/spec_workflow_runner/task_fixer/file_writer.py
   - Create WriteResult, FileWriter classes
   - Implement write_with_backup() using atomic write pattern (temp file + rename)
