@@ -122,7 +122,7 @@
   - _Requirements: R3 (Diff Preview), R4 (Safe File Writing), Testability_
   - _Prompt: Implement the task for spec task-auto-fix, first run spec-workflow-guide to get the workflow guide then implement the task: Role: QA Engineer specializing in file I/O and diff testing | Task: Create unit tests for DiffGenerator and FileWriter in tests/task_fixer/ covering requirements R3 and R4 with 85%+ coverage | Restrictions: Use tempfile.TemporaryDirectory() for file tests, test atomic operations, mock permission errors for error scenarios | Leverage: tempfile for safe test files, pytest.raises for error testing | Success: Diff counting accurate, atomic writes verified, backup creation tested, restore functionality validated, error scenarios covered, 85%+ coverage_
 
-- [ ] 13. Create unit tests for TaskFixer orchestrator
+- [x] 13. Create unit tests for TaskFixer orchestrator
   - File: tests/task_fixer/test_fixer.py
   - Mock all dependencies (Provider, Validator, PromptBuilder, DiffGenerator, FileWriter)
   - Test full fix flow: validation -> prompt -> Claude call -> validation -> diff
