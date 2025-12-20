@@ -10,7 +10,7 @@
   - _Requirements: R1 (Format Validation)_
   - _Prompt: Implement the task for spec task-auto-fix, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Python Developer specializing in validation and regex patterns | Task: Create TaskValidator class in src/spec_workflow_runner/task_fixer/validator.py following requirement R1, using parse_tasks_file() pattern from task_parser.py for baseline validation | Restrictions: Use frozen dataclasses for immutability, no external dependencies beyond stdlib, validation must be pure (no side effects) | Leverage: src/spec_workflow_runner/tui/task_parser.py | Success: ValidationResult accurately identifies missing checkboxes, invalid task IDs, inconsistent numbering; all validation logic tested with 90%+ coverage_
 
-- [ ] 2. Create prompt builder for Claude
+- [x] 2. Create prompt builder for Claude
   - File: src/spec_workflow_runner/task_fixer/prompt_builder.py
   - Create PromptContext, PromptBuilder classes
   - Implement build_prompt() with template loading and formatting
