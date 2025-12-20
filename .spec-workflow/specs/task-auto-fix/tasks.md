@@ -51,7 +51,7 @@
   - _Requirements: R2 (AI-Powered Format Correction), R7 (Dependency Injection)_
   - _Prompt: Implement the task for spec task-auto-fix, first run spec-workflow-guide to get the workflow guide then implement the task: Role: Software Architect specializing in dependency injection and orchestration patterns | Task: Create TaskFixer orchestrator in src/spec_workflow_runner/task_fixer/fixer.py following requirements R2 and R7, coordinating all components with dependency injection | Restrictions: All dependencies injected via constructor, use frozen dataclass for FixResult, validation must occur before AND after Claude call, subprocess timeout 120 seconds | Leverage: ClaudeProvider.build_command(), subprocess.run() for execution | Success: fix_tasks_file() orchestrates full flow correctly, fixed content validated before returning, all dependencies injectable for testing, error handling at each stage_
 
-- [ ] 6. Create factory function and public API
+- [x] 6. Create factory function and public API
   - File: src/spec_workflow_runner/task_fixer/__init__.py
   - Implement create_task_fixer() factory function
   - Create all default dependency instances
