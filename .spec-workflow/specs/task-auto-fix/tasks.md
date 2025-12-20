@@ -20,7 +20,7 @@
   - _Requirements: R2 (AI-Powered Format Correction)_
   - _Prompt: Implement the task for spec task-auto-fix, first run spec-workflow-guide to get the workflow guide then implement the task: Role: AI Prompt Engineer with Python development skills | Task: Create PromptBuilder class in src/spec_workflow_runner/task_fixer/prompt_builder.py following requirement R2, building structured prompts with template content, malformed content, and validation issues | Restrictions: Lazy-load template (cache after first load), use frozen dataclass for PromptContext, prompt must instruct Claude to output ONLY markdown | Leverage: Config for template paths, pathlib.Path for file operations | Success: Prompts include all necessary context (template, issues, content), template loaded only once, prompt format verified manually with Claude_
 
-- [ ] 3. Create diff generator
+- [x] 3. Create diff generator
   - File: src/spec_workflow_runner/task_fixer/diff_generator.py
   - Create DiffResult, DiffGenerator classes
   - Implement generate_diff() using difflib.unified_diff()
