@@ -82,7 +82,7 @@
   - _Requirements: R6 (CLI Integration)_
   - _Prompt: Implement the task for spec task-auto-fix, first run spec-workflow-guide to get the workflow guide then implement the task: Role: CLI Developer with expertise in argparse and command-line UX | Task: Add --fix flag to CLI in src/spec_workflow_runner/tui/cli.py following requirement R6, implementing _handle_fix_command() with diff display and confirmation prompt | Restrictions: Exit code 0 on success/cancellation, non-zero on error, use ClaudeProvider with model='sonnet', must confirm before applying | Leverage: Existing load_config(), discover_specs() functions | Success: --fix SPEC_NAME validates spec exists, displays unified diff, prompts y/n for confirmation, applies fix on y, shows backup path, exits with appropriate codes_
 
-- [ ] 9. Update help panel with F keybinding documentation
+- [x] 9. Update help panel with F keybinding documentation
   - File: src/spec_workflow_runner/tui/views/help_panel.py
   - Add F keybinding entry to "Runner Control" section
   - Document: "F | Auto-fix | Automatically fix format errors in selected spec's tasks.md"
