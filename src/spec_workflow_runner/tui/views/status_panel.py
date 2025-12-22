@@ -9,7 +9,7 @@ from __future__ import annotations
 from datetime import datetime
 
 from rich.panel import Panel
-from rich.progress import Progress, BarColumn, TextColumn
+from rich.progress import BarColumn, Progress, TextColumn
 from rich.table import Table
 from rich.text import Text
 
@@ -79,7 +79,7 @@ def render_status_panel(spec: SpecState | None, project_path: str | None = None)
         BarColumn(complete_style="green", finished_style="green"),
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
     )
-    progress_task = progress.add_task(
+    progress.add_task(
         "",
         total=spec.total_tasks if spec.total_tasks > 0 else 1,
         completed=spec.completed_tasks
@@ -128,9 +128,13 @@ def render_status_panel(spec: SpecState | None, project_path: str | None = None)
     # Determine border color based on completion status
     border_style = "green" if spec.is_complete else "yellow"
 
+    # Build title with runner control hints
+    hints = "[dim](p: provider · m: model · s: start · x: stop · r: restart · X: cleanup dead)[/dim]"
+    title_text = f"[bold]{spec.name}[/bold] {hints}"
+
     return Panel(
         content,
-        title=f"[bold]{spec.name}[/bold]",
+        title=title_text,
         border_style=border_style,
         padding=(1, 2)
     )

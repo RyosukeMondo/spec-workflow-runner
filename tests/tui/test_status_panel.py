@@ -4,7 +4,6 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
 
-import pytest
 from rich.panel import Panel
 
 from spec_workflow_runner.tui.state import RunnerState, RunnerStatus, SpecState

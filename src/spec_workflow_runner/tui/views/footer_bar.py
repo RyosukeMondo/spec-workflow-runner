@@ -29,6 +29,8 @@ def _truncate_text(text: str, max_length: int) -> str:
 def render_footer_bar(
     active_runner_count: int,
     error_message: str | None = None,
+    status_message: str | None = None,
+    last_key: str | None = None,
     terminal_width: int = 80,
 ) -> Text:
     """Build Rich Text displaying footer status bar.
@@ -36,6 +38,8 @@ def render_footer_bar(
     Args:
         active_runner_count: Number of currently active runners
         error_message: Current error message to display, if any
+        status_message: Current status/info message to display, if any
+        last_key: Last key pressed (for debugging), if any
         terminal_width: Terminal width for truncation calculations
 
     Returns:
@@ -54,11 +58,24 @@ def render_footer_bar(
     else:
         parts.append(("No runners active", "dim"))
 
-    # Error message (truncated if needed)
+    # Status message (info/success, truncated if needed)
+    if status_message and not error_message:
+        # Reserve space for runner count, separators, and help hint
+        # Format: "[runner count] | [status] | ?: help · q: quit · c: config"
+        help_hint = " | ?: help · q: quit · c: config"
+        runner_part = parts[0][0] + " | "
+        available_width = terminal_width - len(runner_part) - len(help_hint)
+
+        if available_width > 10:  # Minimum space for meaningful message
+            truncated_status = _truncate_text(status_message, available_width)
+            parts.append((" | ", "dim"))
+            parts.append((truncated_status, "yellow"))
+
+    # Error message (truncated if needed, takes priority over status)
     if error_message:
         # Reserve space for runner count, separators, and help hint
-        # Format: "[runner count] | [error] | Press ? for help"
-        help_hint = " | Press ? for help"
+        # Format: "[runner count] | [error] | ?: help · q: quit · c: config"
+        help_hint = " | ?: help · q: quit · c: config"
         runner_part = parts[0][0] + " | "
         available_width = terminal_width - len(runner_part) - len(help_hint)
 
@@ -67,9 +84,9 @@ def render_footer_bar(
             parts.append((" | ", "dim"))
             parts.append((truncated_error, "red"))
 
-    # Help hint
+    # Global operation hints
     parts.append((" | ", "dim"))
-    parts.append(("Press ? for help", "cyan"))
+    parts.append(("?: help · q: quit · c: config", "cyan"))
 
     # Build the Rich Text object
     footer = Text()

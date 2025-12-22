@@ -3,7 +3,6 @@
 import tempfile
 from pathlib import Path
 
-import pytest
 from rich.panel import Panel
 from rich.text import Text
 

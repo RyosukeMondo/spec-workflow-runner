@@ -14,15 +14,15 @@ import uuid
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 from ..utils import (
     check_clean_working_tree,
     check_mcp_server_exists,
     get_current_commit,
 )
-from .exceptions import RunnerError
-from .state import RunnerState, RunnerStatus, StatePersister
+from .models import RunnerState, RunnerStatus
+from .persistence import StatePersister
 
 if TYPE_CHECKING:
     from ..providers import Provider
@@ -48,17 +48,47 @@ class RunnerManager:
         )
         self.runners: dict[str, RunnerState] = {}
         self.processes: dict[str, subprocess.Popen[str]] = {}
+        self.log_files: dict[str, Any] = {}  # Keep log files open
         self._restore_runners()
 
     def _restore_runners(self) -> None:
         """Restore runner states from disk and validate PIDs."""
+        import os
+
         restored = self.persister.load()
         for runner in restored:
-            self.runners[runner.runner_id] = runner
-            logger.info(
-                f"Restored runner {runner.runner_id} "
-                f"(spec={runner.spec_name}, status={runner.status.value})"
-            )
+            # Validate PID if runner is marked as RUNNING
+            if runner.status == RunnerStatus.RUNNING:
+                # Check if process with this PID still exists
+                try:
+                    os.kill(runner.pid, 0)  # Signal 0 just checks existence
+                    logger.info(
+                        f"Restored running runner {runner.runner_id} "
+                        f"(spec={runner.spec_name}, PID={runner.pid})"
+                    )
+                    self.runners[runner.runner_id] = runner
+                except (OSError, ProcessLookupError):
+                    # Process doesn't exist anymore - mark as crashed
+                    logger.warning(
+                        f"Runner {runner.runner_id} PID {runner.pid} no longer exists, "
+                        f"marking as crashed"
+                    )
+                    crashed_runner = replace(
+                        runner,
+                        status=RunnerStatus.CRASHED,
+                        exit_code=-1,
+                    )
+                    self.runners[runner.runner_id] = crashed_runner
+            else:
+                # Runner is stopped/crashed, just restore as-is
+                self.runners[runner.runner_id] = runner
+                logger.info(
+                    f"Restored {runner.status.value} runner {runner.runner_id} "
+                    f"(spec={runner.spec_name})"
+                )
+
+        # Persist any status changes (crashed runners)
+        self._persist_state()
 
     def _persist_state(self) -> None:
         """Persist current runner states to disk."""
@@ -75,11 +105,11 @@ class RunnerManager:
         Raises:
             Exception: If preconditions are not met
         """
-        # Check for clean working tree
-        check_clean_working_tree(project_path)
+        # Check for clean working tree (non-interactive mode for TUI)
+        check_clean_working_tree(project_path, non_interactive=True)
 
-        # Check for MCP server (Codex only, but providers can handle this)
-        check_mcp_server_exists(provider, project_path)
+        # Check for MCP server and auto-install if not found (non-interactive for TUI)
+        check_mcp_server_exists(provider, project_path, auto_install=True, non_interactive=True)
 
     def start_runner(
         self,
@@ -87,6 +117,9 @@ class RunnerManager:
         spec_name: str,
         provider: Provider,
         model: str,
+        total_tasks: int = 0,
+        completed_tasks: int = 0,
+        in_progress_tasks: int = 0,
     ) -> RunnerState:
         """Start a new runner subprocess for the specified spec.
 
@@ -95,6 +128,9 @@ class RunnerManager:
             spec_name: Name of spec to run
             provider: Provider instance to use
             model: Model identifier to use
+            total_tasks: Total number of tasks in spec
+            completed_tasks: Number of completed tasks
+            in_progress_tasks: Number of in-progress tasks
 
         Returns:
             RunnerState instance for the new runner
@@ -108,8 +144,21 @@ class RunnerManager:
         # Get baseline commit before starting
         baseline_commit = get_current_commit(project_path)
 
+        # Build prompt context with task statistics
+        from datetime import UTC, datetime
+
+        remaining_tasks = total_tasks - completed_tasks
+        context = {
+            "spec_name": spec_name,
+            "tasks_total": total_tasks,
+            "tasks_done": completed_tasks,
+            "tasks_remaining": remaining_tasks,
+            "tasks_in_progress": in_progress_tasks,
+            "timestamp": datetime.now(UTC).isoformat(),
+        }
+
         # Build command for provider
-        prompt = self.config.prompt_template.format(spec_name=spec_name)
+        prompt = self.config.prompt_template.format(**context)
         provider_cmd = provider.build_command(
             prompt=prompt,
             project_path=project_path,
@@ -121,8 +170,10 @@ class RunnerManager:
         log_dir.mkdir(parents=True, exist_ok=True)
 
         # Generate log file path
+        # Support both {index} (for run_tasks.py) and {spec_name}/{timestamp} (for TUI)
         timestamp = time.strftime("%Y%m%d_%H%M%S")
         log_filename = self.config.log_file_template.format(
+            index=1,  # TUI doesn't run iterations
             spec_name=spec_name,
             timestamp=timestamp,
         )
@@ -132,14 +183,15 @@ class RunnerManager:
         cmd_list = provider_cmd.to_list()
         logger.info(f"Starting runner: {' '.join(cmd_list)}")
 
-        with log_path.open("w", encoding="utf-8") as log_file:
-            process = subprocess.Popen(
-                cmd_list,
-                cwd=project_path,
-                stdout=log_file,
-                stderr=subprocess.STDOUT,
-                text=True,
-            )
+        # Open log file and keep it open for the duration of the process
+        log_file = log_path.open("w", encoding="utf-8", buffering=1)  # Line buffered
+        process = subprocess.Popen(
+            cmd_list,
+            cwd=project_path,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            text=True,
+        )
 
         # Create runner state
         runner_id = str(uuid.uuid4())
@@ -155,9 +207,10 @@ class RunnerManager:
             baseline_commit=baseline_commit,
         )
 
-        # Store runner and process
+        # Store runner, process, and log file
         self.runners[runner_id] = runner
         self.processes[runner_id] = process
+        self.log_files[runner_id] = log_file
 
         # Persist state
         self._persist_state()
@@ -190,6 +243,16 @@ class RunnerManager:
         if not process:
             # Process already gone, just update state
             logger.warning(f"No process found for runner {runner_id}, marking as stopped")
+
+            # Close log file if it exists
+            log_file = self.log_files.get(runner_id)
+            if log_file:
+                try:
+                    log_file.close()
+                except Exception as e:
+                    logger.warning(f"Error closing log file: {e}")
+                del self.log_files[runner_id]
+
             updated_runner = replace(
                 runner,
                 status=RunnerStatus.STOPPED,
@@ -209,6 +272,16 @@ class RunnerManager:
             # Process already exited
             logger.info(f"Process {runner.pid} already exited")
             exit_code = process.poll() or 0
+
+            # Close log file
+            log_file = self.log_files.get(runner_id)
+            if log_file:
+                try:
+                    log_file.close()
+                except Exception as e:
+                    logger.warning(f"Error closing log file: {e}")
+                del self.log_files[runner_id]
+
             updated_runner = replace(
                 runner,
                 status=RunnerStatus.STOPPED,
@@ -227,13 +300,22 @@ class RunnerManager:
         except subprocess.TimeoutExpired:
             # Process didn't terminate, escalate to SIGKILL
             logger.warning(
-                f"Process {runner.pid} did not terminate after {timeout}s, "
-                f"sending SIGKILL"
+                f"Process {runner.pid} did not terminate after {timeout}s, " f"sending SIGKILL"
             )
             process.kill()
             exit_code = process.wait()
             logger.info(f"Process {runner.pid} killed (exit code {exit_code})")
             status = RunnerStatus.CRASHED
+
+        # Close log file if it exists
+        log_file = self.log_files.get(runner_id)
+        if log_file:
+            try:
+                log_file.close()
+                logger.info(f"Closed log file for runner {runner_id}")
+            except Exception as e:
+                logger.warning(f"Error closing log file for runner {runner_id}: {e}")
+            del self.log_files[runner_id]
 
         # Update runner state
         updated_runner = replace(
@@ -253,11 +335,7 @@ class RunnerManager:
         Returns:
             List of RunnerState instances with status RUNNING
         """
-        return [
-            runner
-            for runner in self.runners.values()
-            if runner.status == RunnerStatus.RUNNING
-        ]
+        return [runner for runner in self.runners.values() if runner.status == RunnerStatus.RUNNING]
 
     def check_runner_health(self, runner_id: str) -> RunnerStatus:
         """Check if a runner process is still running.

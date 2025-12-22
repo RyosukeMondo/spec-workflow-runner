@@ -40,17 +40,21 @@ class LogViewer:
             self.offset = 0
             self._lines.clear()
 
-    def poll(self) -> None:
-        """Read newly written data from the log file."""
+    def poll(self) -> bool:
+        """Read newly written data from the log file.
+
+        Returns:
+            True if new content was detected, False otherwise
+        """
         if self.log_path is None:
             self.offset = 0
             self._lines.clear()
-            return
+            return False
 
         if not self.log_path.exists():
             self.offset = 0
             self._lines.clear()
-            return
+            return False
 
         try:
             size = self.log_path.stat().st_size
@@ -58,12 +62,13 @@ class LogViewer:
             # File might have been deleted or become inaccessible
             self.offset = 0
             self._lines.clear()
-            return
+            return False
 
         # Handle log rotation: if file size < current offset, reset
         if size < self.offset:
             self.offset = 0
             self._lines.clear()
+            # Don't return yet - continue to read new content below
 
         # Read new content if file has grown
         if size > self.offset:
@@ -76,10 +81,14 @@ class LogViewer:
                 # Buffer new lines
                 for line in chunk.splitlines():
                     self._lines.append(line)
+                return True  # New content detected
             except OSError as exc:
                 # Log read error but continue
                 import logging
                 logging.warning(f"Failed to read log file {self.log_path}: {exc}")
+                return False
+
+        return False  # No new content
 
     def render_panel(self, auto_scroll: bool | None = None) -> Panel:
         """Return a Rich Panel displaying the log tail.
@@ -122,6 +131,7 @@ class LogViewer:
             body = Text(content, overflow="fold")
 
             scroll_indicator = " [Auto]" if effective_auto_scroll else " [Manual]"
-            title = f"Logs – {self.log_path.name}{scroll_indicator}"
+            hints = " [dim](l: toggle · L: re-enable auto · t: tasks)[/dim]"
+            title = f"Logs – {self.log_path.name}{scroll_indicator}{hints}"
 
         return Panel(body, border_style="blue", title=title)

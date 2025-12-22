@@ -8,6 +8,7 @@ import shlex
 import subprocess
 import sys
 import textwrap
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TextIO
@@ -42,8 +43,13 @@ class MultipleSpecsSentinel:
         self.specs = specs
 
 
+class PollPendingTasksSentinel:
+    """Marker object representing the 'poll for pending tasks' selection."""
+
+
 ALL_SPECS_SENTINEL = AllSpecsSentinel()
-SpecOption = tuple[str, Path] | AllSpecsSentinel | MultipleSpecsSentinel
+POLL_PENDING_TASKS_SENTINEL = PollPendingTasksSentinel()
+SpecOption = tuple[str, Path] | AllSpecsSentinel | MultipleSpecsSentinel | PollPendingTasksSentinel
 
 
 def parse_args() -> argparse.Namespace:
@@ -70,7 +76,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--provider",
         type=str,
-        choices=["claude", "codex"],
+        choices=["claude", "codex", "gemini"],
         help="AI provider to use (prompts if not specified).",
     )
     parser.add_argument(
@@ -78,7 +84,9 @@ def parse_args() -> argparse.Namespace:
         type=str,
         help=(
             "AI model to use (prompts if not specified). "
-            "Codex: gpt-5.1-codex-max, gpt-5.1-codex, etc. Claude: sonnet, haiku, opus."
+            "Codex: gpt-5.1-codex-max, gpt-5.1-codex, etc. "
+            "Claude: sonnet, haiku, opus. "
+            "Gemini: gemini-3-pro-preview, gemini-2.5-pro, gemini-2.5-flash."
         ),
     )
     parser.add_argument(
@@ -115,6 +123,8 @@ def _label_option(option: SpecOption) -> str:
         return "All unfinished specs"
     if isinstance(option, MultipleSpecsSentinel):
         return "Multiple specs (custom order)"
+    if isinstance(option, PollPendingTasksSentinel):
+        return "Poll for pending tasks"
     return option[0]
 
 
@@ -139,11 +149,13 @@ def _choose_spec_or_all(
     cfg: Config,
     spec_name: str | None,
 ) -> SpecOption:
-    """Return either a spec tuple, ALL_SPECS_SENTINEL, or MultipleSpecsSentinel."""
+    """Return either a spec tuple, ALL_SPECS_SENTINEL, MultipleSpecsSentinel, or PollPendingTasksSentinel."""
     specs = discover_specs(project, cfg)
     if spec_name:
         if spec_name.lower() == "all":
             return ALL_SPECS_SENTINEL
+        if spec_name.lower() == "poll":
+            return POLL_PENDING_TASKS_SENTINEL
         # Check if it's comma-separated indices like "1,3,5"
         if "," in spec_name:
             selected_specs = _parse_spec_indices(spec_name, specs)
@@ -160,6 +172,7 @@ def _choose_spec_or_all(
         print(f"  {idx}. {name}")
     print("\nOptions:")
     print("  - Enter 'all' for all unfinished specs (sorted by creation time)")
+    print("  - Enter 'poll' to poll every 10s until pending tasks are found")
     print("  - Enter a single number (e.g., '3') for one spec")
     print("  - Enter comma-separated numbers (e.g., '2,5,1') for custom order")
     print("  - Enter spec name directly")
@@ -168,6 +181,9 @@ def _choose_spec_or_all(
 
     if choice.lower() == "all":
         return ALL_SPECS_SENTINEL
+
+    if choice.lower() == "poll":
+        return POLL_PENDING_TASKS_SENTINEL
 
     # Check if it's comma-separated indices
     if "," in choice:
@@ -189,6 +205,30 @@ def _choose_spec_or_all(
             return candidate, path
 
     raise RunnerError(f"Invalid selection: '{choice}'")
+
+
+def poll_for_pending_tasks(project: Path, cfg: Config) -> None:
+    """Poll every 10 seconds until specs with pending tasks are found."""
+    print("\n🔍 Polling for specs with pending tasks every 10 seconds...")
+    print("Press Ctrl+C to stop polling.\n")
+
+    poll_count = 0
+    while True:
+        poll_count += 1
+        current_time = datetime.now().strftime("%H:%M:%S")
+        print(f"[{current_time}] Poll #{poll_count}: Checking for pending tasks...")
+
+        unfinished = list_unfinished_specs(project, cfg)
+        if unfinished:
+            print(f"\n✓ Found {len(unfinished)} spec(s) with pending tasks!")
+            for idx, (name, spec_path) in enumerate(unfinished, start=1):
+                tasks_path = spec_path / cfg.tasks_filename
+                stats = read_task_stats(tasks_path)
+                print(f"  {idx}. {name} - {stats.summary()}")
+            return
+
+        print("  No pending tasks found. Waiting 10 seconds...")
+        time.sleep(10)
 
 
 def run_multiple_specs(
@@ -272,6 +312,7 @@ def ensure_provider(explicit_provider: str | None) -> str:
     providers = [
         ("codex", "Codex with MCP server support"),
         ("claude", "Claude CLI (automation mode, no prompts)"),
+        ("gemini", "Google Gemini CLI (maximum risk/efficiency mode)"),
     ]
     return choose_option(
         "Select AI provider",
@@ -294,6 +335,15 @@ def ensure_model(provider_name: str, explicit_model: str | None) -> str | None:
         "sonnet": "Latest Sonnet - best coding model (recommended)",
         "haiku": "Fast and cost-effective (3x cheaper, 2x faster)",
         "opus": "Most intelligent for complex tasks",
+        "gemini-3-pro-preview": "Gemini 3 Pro - Most intelligent, state-of-the-art (recommended)",
+        "gemini-3-flash-preview": "Gemini 3 Flash - Fast preview with high intelligence",
+        "gemini-2.5-pro": "Gemini 2.5 Pro - 1M token context, advanced reasoning",
+        "gemini-2.5-flash": "Gemini 2.5 Flash - Lightning-fast, high capability",
+        "gemini-2.5-flash-lite": "Gemini 2.5 Flash Lite - Ultra-fast, lightweight",
+        "gemini-2.0-flash-exp": "Gemini 2.0 Flash Experimental - Latest experimental features",
+        "gemini-1.5-pro": "Gemini 1.5 Pro - Stable, proven performance",
+        "gemini-1.5-flash": "Gemini 1.5 Flash - Fast and reliable",
+        "gemini-1.5-flash-8b": "Gemini 1.5 Flash 8B - Compact, efficient model",
     }
 
     models_with_desc = [(model, model_descriptions.get(model, "")) for model in supported_models]
@@ -529,6 +579,13 @@ def main() -> int:
             run_all_specs(provider, cfg, project, args.dry_run)
         elif isinstance(selection, MultipleSpecsSentinel):
             run_multiple_specs(provider, cfg, project, selection.specs, args.dry_run)
+        elif isinstance(selection, PollPendingTasksSentinel):
+            if args.dry_run:
+                print("\n[DRY-RUN MODE] Would poll for pending tasks every 10 seconds.")
+                print("When found, would automatically start executing them.")
+            else:
+                poll_for_pending_tasks(project, cfg)
+                run_all_specs(provider, cfg, project, args.dry_run)
         else:
             spec_name, spec_path = selection
             run_loop(provider, cfg, project, spec_name, spec_path, args.dry_run)

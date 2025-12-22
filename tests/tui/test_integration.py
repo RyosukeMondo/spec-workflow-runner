@@ -8,18 +8,13 @@ This module tests end-to-end workflows including:
 
 from __future__ import annotations
 
-import json
-import queue
-import threading
-import time
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, call, mock_open, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
 from spec_workflow_runner.tui.app import TUIApp
-from spec_workflow_runner.tui.exceptions import ConfigError, RunnerError, StateError
 from spec_workflow_runner.tui.keybindings import KeybindingHandler
 from spec_workflow_runner.tui.runner_manager import RunnerManager
 from spec_workflow_runner.tui.state import (
@@ -28,7 +23,6 @@ from spec_workflow_runner.tui.state import (
     RunnerState,
     RunnerStatus,
     SpecState,
-    StatePoller,
     StateUpdate,
 )
 from spec_workflow_runner.utils import Config, TaskStats
@@ -603,6 +597,7 @@ class TestCompleteWorkflow:
 
                 # Navigate to spec
                 app.keybinding_handler.handle_key("down")  # Select project
+                app.keybinding_handler.handle_key(" ")     # Expand project (collapsed by default)
                 app.keybinding_handler.handle_key("down")  # Select spec
 
                 # Verify selection

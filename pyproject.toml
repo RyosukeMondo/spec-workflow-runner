@@ -26,7 +26,7 @@ dev = [
 spec-workflow-run = "spec_workflow_runner.run_tasks:main"
 spec-workflow-monitor = "spec_workflow_runner.monitor:main"
 spec-workflow-pipx = "spec_workflow_runner.pipx_installer:main"
-spec-workflow-tui = "spec_workflow_runner.tui.app:main"
+spec-workflow-tui = "spec_workflow_runner.tui.cli:main"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/spec_workflow_runner"]

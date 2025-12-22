@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import queue
 import time
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
@@ -27,7 +27,7 @@ from spec_workflow_runner.tui.state import (
     SpecState,
     StatePoller,
 )
-from spec_workflow_runner.utils import Config, TaskStats
+from spec_workflow_runner.utils import Config
 
 
 @pytest.fixture

@@ -1,0 +1,14 @@
+{
+  "filePath": ".spec-workflow/specs/task-auto-fix/requirements.md",
+  "currentVersion": 1,
+  "snapshots": [
+    {
+      "version": 1,
+      "filename": "snapshot-001.json",
+      "timestamp": "2025-12-20T05:28:09.639Z",
+      "trigger": "initial",
+      "approvalId": "approval_1766208489616_1yi11z5kw",
+      "approvalTitle": "Requirements for task-auto-fix spec"
+    }
+  ]
+}

@@ -37,6 +37,18 @@ class Provider(ABC):
         """Get command to list available MCP servers."""
 
     @abstractmethod
+    def get_mcp_add_command(self, server_name: str, package: str) -> ProviderCommand:
+        """Get command to add an MCP server.
+
+        Args:
+            server_name: Name of the MCP server (e.g., 'spec-workflow')
+            package: NPX package to run (e.g., 'npx @pimzino/spec-workflow-mcp@latest')
+
+        Returns:
+            Command to add the MCP server
+        """
+
+    @abstractmethod
     def get_provider_name(self) -> str:
         """Get the human-readable provider name."""
 
@@ -78,6 +90,10 @@ class CodexProvider(Provider):
     def get_mcp_list_command(self) -> ProviderCommand:
         """Get command to list available MCP servers."""
         return ProviderCommand(executable="codex", args=("mcp", "list"))
+
+    def get_mcp_add_command(self, server_name: str, package: str) -> ProviderCommand:
+        """Get command to add an MCP server."""
+        return ProviderCommand(executable="codex", args=("mcp", "add", server_name, package))
 
     def get_provider_name(self) -> str:
         """Get the human-readable provider name."""
@@ -121,9 +137,71 @@ class ClaudeProvider(Provider):
         """Get command to list available MCP servers."""
         return ProviderCommand(executable=self._executable, args=("mcp", "list"))
 
+    def get_mcp_add_command(self, server_name: str, package: str) -> ProviderCommand:
+        """Get command to add an MCP server."""
+        return ProviderCommand(executable=self._executable, args=("mcp", "add", server_name, package))
+
     def get_provider_name(self) -> str:
         """Get the human-readable provider name."""
         return "Claude CLI"
+
+
+class GeminiProvider(Provider):
+    """Provider for Google Gemini CLI backend with maximum risk/efficiency settings."""
+
+    SUPPORTED_MODELS = (
+        "gemini-3-pro-preview",
+        "gemini-3-flash-preview",
+        "gemini-2.5-pro",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-2.0-flash-exp",
+        "gemini-1.5-pro",
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-8b",
+    )
+
+    def __init__(
+        self,
+        executable: str = "gemini",
+        model: str | None = None,
+        max_risk: bool = True,
+    ) -> None:
+        self._executable = executable
+        self._model = model
+        self._max_risk = max_risk
+
+    def build_command(
+        self,
+        prompt: str,
+        project_path: Path,
+        config_overrides: Sequence[tuple[str, str]],
+    ) -> ProviderCommand:
+        """Build gemini command with maximum risk settings for efficiency."""
+        args = ["-p", prompt]
+
+        if self._model:
+            args.extend(["--model", self._model])
+
+        if self._max_risk:
+            args.extend([
+                "--yolo",
+                "--output-format", "json",
+            ])
+
+        return ProviderCommand(executable=self._executable, args=tuple(args))
+
+    def get_mcp_list_command(self) -> ProviderCommand:
+        """Get command to list available MCP servers."""
+        return ProviderCommand(executable=self._executable, args=("mcp", "list"))
+
+    def get_mcp_add_command(self, server_name: str, package: str) -> ProviderCommand:
+        """Get command to add an MCP server."""
+        return ProviderCommand(executable=self._executable, args=("mcp", "add", server_name, package))
+
+    def get_provider_name(self) -> str:
+        """Get the human-readable provider name."""
+        return "Google Gemini"
 
 
 def get_supported_models(provider_name: str) -> tuple[str, ...]:
@@ -132,6 +210,8 @@ def get_supported_models(provider_name: str) -> tuple[str, ...]:
         return CodexProvider.SUPPORTED_MODELS
     if provider_name == "claude":
         return ClaudeProvider.SUPPORTED_MODELS
+    if provider_name == "gemini":
+        return GeminiProvider.SUPPORTED_MODELS
     raise ValueError(f"Unknown provider: {provider_name}")
 
 
@@ -145,4 +225,6 @@ def create_provider(
         return CodexProvider(base_command=base_command, model=model)
     if provider_name == "claude":
         return ClaudeProvider(model=model)
+    if provider_name == "gemini":
+        return GeminiProvider(model=model, max_risk=True)
     raise ValueError(f"Unknown provider: {provider_name}")

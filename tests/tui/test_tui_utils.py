@@ -1,12 +1,11 @@
 """Unit tests for TUI utility functions."""
 
-import pytest
 from spec_workflow_runner.tui.tui_utils import (
     RunnerStatus,
     format_duration,
-    truncate_text,
-    get_terminal_size,
     get_status_badge,
+    get_terminal_size,
+    truncate_text,
 )
 
 

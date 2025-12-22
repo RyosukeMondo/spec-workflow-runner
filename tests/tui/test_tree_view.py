@@ -3,7 +3,6 @@
 from datetime import datetime
 from pathlib import Path
 
-import pytest
 from rich.tree import Tree
 
 from spec_workflow_runner.tui.state import (
@@ -161,7 +160,7 @@ class TestRenderTree:
 
     def test_empty_projects_list(self):
         """Test rendering with no projects."""
-        tree = render_tree([], None, None)
+        tree, _ = render_tree([], None, None)
         assert isinstance(tree, Tree)
         assert tree.label == "📁 Projects"
 
@@ -172,7 +171,7 @@ class TestRenderTree:
             name="test-project",
             specs=[],
         )
-        tree = render_tree([project], None, None)
+        tree, _ = render_tree([project], None, None)
         assert isinstance(tree, Tree)
         # Project with no visible specs should not be added
 
@@ -191,7 +190,7 @@ class TestRenderTree:
             name="test-project",
             specs=[spec],
         )
-        tree = render_tree([project], None, None)
+        tree, _ = render_tree([project], None, None)
         assert isinstance(tree, Tree)
 
     def test_selection_highlighting_project(self):
@@ -209,7 +208,7 @@ class TestRenderTree:
             name="test-project",
             specs=[spec],
         )
-        tree = render_tree([project], selected_project_index=0, selected_spec_index=None)
+        tree, _ = render_tree([project], selected_project_index=0, selected_spec_index=None)
         assert isinstance(tree, Tree)
         # Check that tree was created (detailed inspection of Rich Tree is complex)
 
@@ -228,7 +227,7 @@ class TestRenderTree:
             name="test-project",
             specs=[spec],
         )
-        tree = render_tree([project], selected_project_index=0, selected_spec_index=0)
+        tree, _ = render_tree([project], selected_project_index=0, selected_spec_index=0)
         assert isinstance(tree, Tree)
 
     def test_filter_by_project_name(self):
@@ -259,7 +258,7 @@ class TestRenderTree:
             name="other-project",
             specs=[spec2],
         )
-        tree = render_tree([project1, project2], None, None, filter_text="matching")
+        tree, _ = render_tree([project1, project2], None, None, filter_text="matching")
         assert isinstance(tree, Tree)
 
     def test_filter_by_spec_name(self):
@@ -285,7 +284,7 @@ class TestRenderTree:
             name="test-project",
             specs=[spec1, spec2],
         )
-        tree = render_tree([project], None, None, filter_text="matching")
+        tree, _ = render_tree([project], None, None, filter_text="matching")
         assert isinstance(tree, Tree)
 
     def test_show_unfinished_only(self):
@@ -311,7 +310,7 @@ class TestRenderTree:
             name="test-project",
             specs=[spec_complete, spec_incomplete],
         )
-        tree = render_tree([project], None, None, show_unfinished_only=True)
+        tree, _ = render_tree([project], None, None, show_unfinished_only=True)
         assert isinstance(tree, Tree)
         # Complete spec should be filtered out
 
@@ -346,7 +345,7 @@ class TestRenderTree:
             name="test-project",
             specs=[spec1, spec2, spec3],
         )
-        tree = render_tree(
+        tree, _ = render_tree(
             [project],
             None,
             None,
@@ -371,7 +370,7 @@ class TestRenderTree:
             name="test-project",
             specs=[spec],
         )
-        tree = render_tree([project], None, None)
+        tree, _ = render_tree([project], None, None)
         assert isinstance(tree, Tree)
         # Task ratio "7/10 tasks" should be in the tree
 
@@ -393,7 +392,7 @@ class TestRenderTree:
             name="test-project",
             specs=specs,
         )
-        tree = render_tree([project], None, None)
+        tree, _ = render_tree([project], None, None)
         assert isinstance(tree, Tree)
         # "5 specs" should be in the tree
 
@@ -425,7 +424,7 @@ class TestRenderTree:
             name="project2",
             specs=[spec2],
         )
-        tree = render_tree([project1, project2], None, None)
+        tree, _ = render_tree([project1, project2], None, None)
         assert isinstance(tree, Tree)
 
     def test_status_badge_for_running_spec(self):
@@ -455,7 +454,7 @@ class TestRenderTree:
             name="test-project",
             specs=[spec],
         )
-        tree = render_tree([project], None, None)
+        tree, _ = render_tree([project], None, None)
         assert isinstance(tree, Tree)
 
     def test_no_specs_after_filtering(self):
@@ -473,7 +472,7 @@ class TestRenderTree:
             name="test-project",
             specs=[spec],
         )
-        tree = render_tree([project], None, None, filter_text="nonexistent")
+        tree, _ = render_tree([project], None, None, filter_text="nonexistent")
         assert isinstance(tree, Tree)
         # Project should not be visible since no specs match
 
@@ -510,7 +509,7 @@ class TestRenderTree:
         )
         # With filter, visible specs are: matching1, matching2
         # Select visible_spec_idx=1 (which is matching2)
-        tree = render_tree(
+        tree, _ = render_tree(
             [project],
             selected_project_index=0,
             selected_spec_index=1,

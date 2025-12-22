@@ -9,6 +9,7 @@ import pytest
 from spec_workflow_runner.providers import (
     ClaudeProvider,
     CodexProvider,
+    GeminiProvider,
     create_provider,
     get_supported_models,
 )
@@ -220,3 +221,131 @@ def test_get_supported_models_claude() -> None:
 def test_get_supported_models_raises_on_unknown() -> None:
     with pytest.raises(ValueError, match="Unknown provider: invalid"):
         get_supported_models("invalid")
+
+
+def test_gemini_provider_builds_basic_command() -> None:
+    provider = GeminiProvider()
+    cmd = provider.build_command(
+        prompt="test prompt",
+        project_path=Path("/tmp/project"),
+        config_overrides=(),
+    )
+
+    assert cmd.executable == "gemini"
+    assert "-p" in cmd.args
+    assert "test prompt" in cmd.args
+
+
+def test_gemini_provider_with_max_risk_settings() -> None:
+    provider = GeminiProvider(max_risk=True)
+    cmd = provider.build_command(
+        prompt="test prompt",
+        project_path=Path("/tmp/project"),
+        config_overrides=(),
+    )
+
+    assert cmd.executable == "gemini"
+    assert "--yolo" in cmd.args
+    assert "--output-format" in cmd.args
+    assert "json" in cmd.args
+
+
+def test_gemini_provider_without_max_risk_settings() -> None:
+    provider = GeminiProvider(max_risk=False)
+    cmd = provider.build_command(
+        prompt="test prompt",
+        project_path=Path("/tmp/project"),
+        config_overrides=(),
+    )
+
+    assert cmd.executable == "gemini"
+    assert "--yolo" not in cmd.args
+    assert "--output-format" not in cmd.args
+
+
+def test_gemini_provider_with_model() -> None:
+    provider = GeminiProvider(model="gemini-2.5-pro")
+    cmd = provider.build_command(
+        prompt="test prompt",
+        project_path=Path("/tmp/project"),
+        config_overrides=(),
+    )
+
+    assert cmd.executable == "gemini"
+    assert "--model" in cmd.args
+    assert "gemini-2.5-pro" in cmd.args
+
+
+def test_gemini_provider_with_model_and_max_risk() -> None:
+    provider = GeminiProvider(model="gemini-3-pro", max_risk=True)
+    cmd = provider.build_command(
+        prompt="test prompt",
+        project_path=Path("/tmp/project"),
+        config_overrides=(),
+    )
+
+    assert cmd.executable == "gemini"
+    assert "--model" in cmd.args
+    assert "gemini-3-pro" in cmd.args
+    assert "--yolo" in cmd.args
+    assert "--output-format" in cmd.args
+    assert "json" in cmd.args
+
+
+def test_gemini_provider_to_list() -> None:
+    provider = GeminiProvider()
+    cmd = provider.build_command(
+        prompt="test",
+        project_path=Path("/tmp/project"),
+        config_overrides=(),
+    )
+
+    result = cmd.to_list()
+    assert result[0] == "gemini"
+    assert "-p" in result
+    assert "test" in result
+
+
+def test_create_provider_creates_gemini() -> None:
+    provider = create_provider("gemini", base_command=("gemini",))
+    assert isinstance(provider, GeminiProvider)
+
+
+def test_create_provider_gemini_with_model() -> None:
+    provider = create_provider("gemini", base_command=("gemini",), model="gemini-2.5-pro")
+    assert isinstance(provider, GeminiProvider)
+    cmd = provider.build_command(
+        prompt="test",
+        project_path=Path("/tmp/project"),
+        config_overrides=(),
+    )
+    assert "--model" in cmd.args
+    assert "gemini-2.5-pro" in cmd.args
+
+
+def test_get_supported_models_gemini() -> None:
+    models = get_supported_models("gemini")
+    expected_models = {
+        "gemini-3-pro-preview",
+        "gemini-3-flash-preview",
+        "gemini-2.5-pro",
+        "gemini-2.5-flash",
+        "gemini-2.5-flash-lite",
+        "gemini-2.0-flash-exp",
+        "gemini-1.5-pro",
+        "gemini-1.5-flash",
+        "gemini-1.5-flash-8b",
+    }
+    assert set(models) == expected_models
+
+
+def test_gemini_provider_get_mcp_list_command() -> None:
+    provider = GeminiProvider()
+    cmd = provider.get_mcp_list_command()
+    assert cmd.executable == "gemini"
+    assert cmd.args == ("mcp", "list")
+
+
+def test_gemini_provider_get_provider_name() -> None:
+    provider = GeminiProvider()
+    assert provider.get_provider_name() == "Google Gemini"

@@ -6,11 +6,11 @@ import signal
 import subprocess
 from datetime import datetime
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, PropertyMock, call, mock_open, patch
+from unittest.mock import Mock, mock_open, patch
 
 import pytest
 
-from spec_workflow_runner.providers import ClaudeProvider, CodexProvider, ProviderCommand
+from spec_workflow_runner.providers import ClaudeProvider, ProviderCommand
 from spec_workflow_runner.tui.runner_manager import RunnerManager
 from spec_workflow_runner.tui.state import RunnerState, RunnerStatus
 from spec_workflow_runner.utils import Config
