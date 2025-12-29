@@ -503,8 +503,24 @@ TASK_PATTERN = re.compile(
 def read_task_stats(tasks_path: Path) -> TaskStats:
     """Parse task status counts from tasks.md."""
     text = tasks_path.read_text(encoding="utf-8")
+
+    # Only count tasks in the "## Tasks" section
+    # Stop counting at "## Task Validation Checklist" or similar
+    tasks_section_start = text.find("## Tasks")
+    if tasks_section_start == -1:
+        # Fallback: use entire file if no Tasks section found
+        task_text = text
+    else:
+        # Find the end of Tasks section (next ## heading or end of file)
+        task_text_start = tasks_section_start + len("## Tasks")
+        next_section = text.find("\n## ", task_text_start)
+        if next_section == -1:
+            task_text = text[tasks_section_start:]
+        else:
+            task_text = text[tasks_section_start:next_section]
+
     pending = done = in_progress = 0
-    for match in TASK_PATTERN.finditer(text):
+    for match in TASK_PATTERN.finditer(task_text):
         state = match.group("state").lower()
         if state == "x":
             done += 1
