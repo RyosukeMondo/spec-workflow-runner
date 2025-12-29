@@ -27,6 +27,7 @@ from .utils import (
     display_spec_queue,
     get_current_commit,
     has_uncommitted_changes,
+    is_context_limit_error,
     list_unfinished_specs,
     load_config,
     read_task_stats,
@@ -411,6 +412,7 @@ def _execute_provider_command(command: list[str], project_path: Path, header: st
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
 
+    output_lines: list[str] = []
     with log_path.open("w", encoding="utf-8") as handle:
         handle.write(header)
         proc = subprocess.Popen(
@@ -427,11 +429,14 @@ def _execute_provider_command(command: list[str], project_path: Path, header: st
             print(decoded, end="")
             handle.write(decoded)
             handle.flush()
+            output_lines.append(decoded)
         proc.wait()
         handle.write(f"\n# Exit Code\n{proc.returncode}\n")
 
     if proc.returncode != 0:
-        raise RunnerError("Provider command failed. See log for details.")
+        # Include output in error message for better error detection
+        output_text = "".join(output_lines)
+        raise RunnerError(f"Provider command failed. Output: {output_text}")
     print(f"Saved log: {log_path}")
 
 
@@ -459,7 +464,9 @@ def run_provider(
 
     # Retry loop with exponential backoff
     last_error: Exception | None = None
-    for attempt in range(1, cfg.max_retries + 1):
+    attempt = 1
+    
+    while True:
         try:
             _execute_provider_command(command, project_path, header, log_path)
             if attempt > 1:
@@ -476,8 +483,39 @@ def run_provider(
             return  # Success - exit retry loop
         except RunnerError as err:
             last_error = err
+            
+            # Check if this is a context limit error
+            error_message = str(err)
+            is_context_error = is_context_limit_error(error_message)
+
+            if is_context_error:
+                # Use configured wait time for context limit errors (default: 10 minutes)
+                backoff_seconds = cfg.context_limit_wait_seconds
+                wait_minutes = backoff_seconds // 60
+                logger.warning(
+                    "Context limit exceeded, waiting before retry",
+                    extra={
+                        "extra_context": {
+                            "attempt": attempt,
+                            "max_retries": cfg.max_retries,
+                            "wait_seconds": backoff_seconds,
+                            "wait_minutes": wait_minutes,
+                            "spec_name": spec_name,
+                            "iteration": iteration,
+                            "error": error_message,
+                        }
+                    },
+                )
+                print(
+                    f"⚠️  Context limit exceeded. "
+                    f"Waiting {wait_minutes} minutes ({backoff_seconds}s) before retry..."
+                )
+                time.sleep(backoff_seconds)
+                # Do not increment attempt for context limits - retry infinitely
+                continue
+
             if attempt < cfg.max_retries:
-                # Calculate exponential backoff: 2^(attempt-1) seconds
+                # Calculate exponential backoff for other errors: 2^(attempt-1) seconds
                 backoff_seconds = 2 ** (attempt - 1)
                 logger.warning(
                     "Provider command failed, retrying with backoff",
@@ -488,7 +526,7 @@ def run_provider(
                             "backoff_seconds": backoff_seconds,
                             "spec_name": spec_name,
                             "iteration": iteration,
-                            "error": str(err),
+                            "error": error_message,
                         }
                     },
                 )
@@ -497,6 +535,7 @@ def run_provider(
                     f"Retrying in {backoff_seconds}s..."
                 )
                 time.sleep(backoff_seconds)
+                attempt += 1
             else:
                 logger.error(
                     "Provider command failed after all retries",
@@ -509,10 +548,8 @@ def run_provider(
                         }
                     },
                 )
-
-    # All retries exhausted - raise the last error
-    assert last_error is not None
-    raise last_error
+                # All retries exhausted - raise the last error
+                raise last_error
 
 
 def _display_dry_run_spec_status(spec_name: str, spec_path: Path, stats: TaskStats) -> None:

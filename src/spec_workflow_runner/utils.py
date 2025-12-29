@@ -22,6 +22,47 @@ class RunnerError(Exception):
     """Raised when the run needs to abort early."""
 
 
+def is_context_limit_error(error_message: str) -> bool:
+    """Detect if an error is due to context limit/window exceeded.
+
+    Checks for common error patterns from different LLM providers:
+    - Claude: "context limit", "exceed context", "context window"
+    - OpenAI: "context_length_exceeded", "exceeds the context window"
+    - Gemini: "RESOURCE_EXHAUSTED" (context-related)
+
+    Args:
+        error_message: The error message string to check
+
+    Returns:
+        True if the error is a context limit error, False otherwise
+    """
+    error_lower = error_message.lower()
+
+    # Claude API error patterns
+    if "context limit" in error_lower:
+        return True
+    if "exceed context" in error_lower or "exceeds context" in error_lower:
+        return True
+    if "context window" in error_lower:
+        return True
+    if "hit your limit" in error_lower:
+        return True
+
+    # OpenAI error patterns
+    if "context_length_exceeded" in error_lower:
+        return True
+    if "exceeds the context window" in error_lower:
+        return True
+    if "maximum context length" in error_lower:
+        return True
+
+    # Gemini error patterns (be specific to avoid false positives)
+    if "resource_exhausted" in error_lower and ("token" in error_lower or "context" in error_lower):
+        return True
+
+    return False
+
+
 def get_current_commit(repo_path: Path) -> str:
     """Return the current HEAD commit id for the repo."""
     result = subprocess.run(
@@ -236,6 +277,7 @@ class Config:
     tui_min_terminal_cols: int = 80
     tui_min_terminal_rows: int = 24
     max_retries: int = 3
+    context_limit_wait_seconds: int = 600
 
     @classmethod
     def from_dict(cls, payload: dict) -> Config:
@@ -258,6 +300,7 @@ class Config:
         tui_min_terminal_cols = int(payload.get("tui_min_terminal_cols", 80))
         tui_min_terminal_rows = int(payload.get("tui_min_terminal_rows", 24))
         max_retries = int(payload.get("max_retries", 3))
+        context_limit_wait_seconds = int(payload.get("context_limit_wait_seconds", 600))
 
         if tui_refresh_seconds <= 0:
             raise ValueError(f"tui_refresh_seconds must be positive, got {tui_refresh_seconds}")
@@ -273,6 +316,10 @@ class Config:
             )
         if max_retries <= 0:
             raise ValueError(f"max_retries must be positive, got {max_retries}")
+        if context_limit_wait_seconds <= 0:
+            raise ValueError(
+                f"context_limit_wait_seconds must be positive, got {context_limit_wait_seconds}"
+            )
 
         return cls(
             repos_root=repos_root,
@@ -294,6 +341,7 @@ class Config:
             tui_min_terminal_cols=tui_min_terminal_cols,
             tui_min_terminal_rows=tui_min_terminal_rows,
             max_retries=max_retries,
+            context_limit_wait_seconds=context_limit_wait_seconds,
         )
 
 

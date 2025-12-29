@@ -557,3 +557,209 @@ def test_run_provider_logs_retry_attempts(tmp_path: Path, monkeypatch, caplog) -
 
     # Check that warning was logged for retry
     assert any("retrying with backoff" in record.message.lower() for record in caplog.records)
+
+
+def test_run_provider_context_limit_error_uses_long_wait(tmp_path: Path, monkeypatch) -> None:
+    """Verify that context limit errors trigger configured wait time instead of exponential backoff."""
+    cfg = _make_config()
+    provider = CodexProvider()
+    log_path = tmp_path / "logs" / "task_1.log"
+
+    attempt_count = {"count": 0}
+
+    class DummyProcess:
+        def __init__(self) -> None:
+            attempt_count["count"] += 1
+            # Simulate context limit error on first attempt
+            if attempt_count["count"] == 1:
+                self.stdout = io.BytesIO(
+                    b"Error: input length and max_tokens exceed context limit: 197626 + 21333 > 200000\n"
+                )
+                self.returncode = 1
+            else:
+                self.stdout = io.BytesIO(b"success\n")
+                self.returncode = 0
+
+        def wait(self) -> None:
+            return None
+
+    def fake_popen(command, **kwargs):  # type: ignore[no-untyped-def]
+        return DummyProcess()
+
+    sleep_calls: list[float] = []
+
+    def track_sleep(seconds: float) -> None:
+        sleep_calls.append(seconds)
+
+    monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(runner.time, "sleep", track_sleep)
+
+    runner.run_provider(
+        provider,
+        cfg,
+        project_path=tmp_path,
+        prompt="test prompt",
+        dry_run=False,
+        spec_name="test-spec",
+        iteration=1,
+        log_path=log_path,
+    )
+
+    assert attempt_count["count"] == 2
+    # Should use context_limit_wait_seconds (600) instead of exponential backoff (1)
+    assert sleep_calls == [600]
+
+
+def test_run_provider_context_limit_error_logs_wait_time(
+    tmp_path: Path, monkeypatch, caplog
+) -> None:
+    """Verify that context limit errors log the wait time correctly."""
+    import logging
+
+    caplog.set_level(logging.WARNING)
+
+    cfg = _make_config()
+    provider = CodexProvider()
+    log_path = tmp_path / "logs" / "task_1.log"
+
+    attempt_count = {"count": 0}
+
+    class DummyProcess:
+        def __init__(self) -> None:
+            attempt_count["count"] += 1
+            if attempt_count["count"] == 1:
+                self.stdout = io.BytesIO(b"Error: context window exceeded\n")
+                self.returncode = 1
+            else:
+                self.stdout = io.BytesIO(b"success\n")
+                self.returncode = 0
+
+        def wait(self) -> None:
+            return None
+
+    def fake_popen(command, **kwargs):  # type: ignore[no-untyped-def]
+        return DummyProcess()
+
+    mock_sleep = MagicMock()
+    monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(runner.time, "sleep", mock_sleep)
+
+    runner.run_provider(
+        provider,
+        cfg,
+        project_path=tmp_path,
+        prompt="test prompt",
+        dry_run=False,
+        spec_name="test-spec",
+        iteration=1,
+        log_path=log_path,
+    )
+
+    # Check that context limit message was logged
+    assert any("context limit" in record.message.lower() for record in caplog.records)
+    mock_sleep.assert_called_once_with(600)
+
+
+def test_run_provider_non_context_error_uses_exponential_backoff(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """Verify that non-context errors still use exponential backoff."""
+    cfg = _make_config()
+    provider = CodexProvider()
+    log_path = tmp_path / "logs" / "task_1.log"
+
+    attempt_count = {"count": 0}
+
+    class DummyProcess:
+        def __init__(self) -> None:
+            attempt_count["count"] += 1
+            if attempt_count["count"] < 3:
+                # Regular error, not context limit
+                self.stdout = io.BytesIO(b"Error: Connection timeout\n")
+                self.returncode = 1
+            else:
+                self.stdout = io.BytesIO(b"success\n")
+                self.returncode = 0
+
+        def wait(self) -> None:
+            return None
+
+    def fake_popen(command, **kwargs):  # type: ignore[no-untyped-def]
+        return DummyProcess()
+
+    sleep_calls: list[float] = []
+
+    def track_sleep(seconds: float) -> None:
+        sleep_calls.append(seconds)
+
+    monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(runner.time, "sleep", track_sleep)
+
+    runner.run_provider(
+        provider,
+        cfg,
+        project_path=tmp_path,
+        prompt="test prompt",
+        dry_run=False,
+        spec_name="test-spec",
+        iteration=1,
+        log_path=log_path,
+    )
+
+    assert attempt_count["count"] == 3
+    # Should use exponential backoff: 2^0=1, 2^1=2
+    assert sleep_calls == [1, 2]
+
+
+def test_run_provider_infinite_retries_for_context_limit(tmp_path: Path, monkeypatch) -> None:
+    """Verify that context limit errors trigger infinite retries beyond max_retries."""
+    cfg = _make_config()
+    # Ensure max_retries is small to verify we go beyond it
+    assert cfg.max_retries == 3
+    
+    provider = CodexProvider()
+    log_path = tmp_path / "logs" / "task_1.log"
+
+    attempt_count = {"count": 0}
+
+    class DummyProcess:
+        def __init__(self) -> None:
+            attempt_count["count"] += 1
+            # Simulate context limit error for first 5 attempts (more than max_retries=3)
+            if attempt_count["count"] <= 5:
+                self.stdout = io.BytesIO(b"Error: You've hit your limit\n")
+                self.returncode = 1
+            else:
+                self.stdout = io.BytesIO(b"success\n")
+                self.returncode = 0
+
+        def wait(self) -> None:
+            return None
+
+    def fake_popen(command, **kwargs):  # type: ignore[no-untyped-def]
+        return DummyProcess()
+
+    sleep_calls: list[float] = []
+
+    def track_sleep(seconds: float) -> None:
+        sleep_calls.append(seconds)
+
+    monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(runner.time, "sleep", track_sleep)
+
+    runner.run_provider(
+        provider,
+        cfg,
+        project_path=tmp_path,
+        prompt="test prompt",
+        dry_run=False,
+        spec_name="test-spec",
+        iteration=1,
+        log_path=log_path,
+    )
+
+    # Should attempt 6 times (5 fails + 1 success)
+    assert attempt_count["count"] == 6
+    # Should sleep 5 times with context_limit_wait_seconds (600)
+    assert len(sleep_calls) == 5
+    assert all(s == 600 for s in sleep_calls)
