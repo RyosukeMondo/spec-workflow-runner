@@ -235,6 +235,7 @@ class Config:
     tui_log_tail_lines: int = 200
     tui_min_terminal_cols: int = 80
     tui_min_terminal_rows: int = 24
+    max_retries: int = 3
 
     @classmethod
     def from_dict(cls, payload: dict) -> Config:
@@ -256,6 +257,7 @@ class Config:
         tui_log_tail_lines = int(payload.get("tui_log_tail_lines", 200))
         tui_min_terminal_cols = int(payload.get("tui_min_terminal_cols", 80))
         tui_min_terminal_rows = int(payload.get("tui_min_terminal_rows", 24))
+        max_retries = int(payload.get("max_retries", 3))
 
         if tui_refresh_seconds <= 0:
             raise ValueError(f"tui_refresh_seconds must be positive, got {tui_refresh_seconds}")
@@ -269,6 +271,8 @@ class Config:
             raise ValueError(
                 f"tui_min_terminal_rows must be positive, got {tui_min_terminal_rows}"
             )
+        if max_retries <= 0:
+            raise ValueError(f"max_retries must be positive, got {max_retries}")
 
         return cls(
             repos_root=repos_root,
@@ -289,6 +293,7 @@ class Config:
             tui_log_tail_lines=tui_log_tail_lines,
             tui_min_terminal_cols=tui_min_terminal_cols,
             tui_min_terminal_rows=tui_min_terminal_rows,
+            max_retries=max_retries,
         )
 
 
@@ -442,7 +447,7 @@ def discover_specs(project_path: Path, cfg: Config) -> list[tuple[str, Path]]:
 
 
 TASK_PATTERN = re.compile(
-    r"^\s*-\s\[(?P<state>[ x-])\]",
+    r"^-\s\[(?P<state>[ x-])\]",
     re.MULTILINE | re.IGNORECASE,
 )
 
