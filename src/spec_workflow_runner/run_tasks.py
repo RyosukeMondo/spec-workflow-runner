@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 import shlex
 import subprocess
@@ -30,6 +31,8 @@ from .utils import (
     load_config,
     read_task_stats,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class AllSpecsSentinel:
@@ -454,7 +457,62 @@ def run_provider(
         _write_dry_run_log(log_path, header, formatted_command)
         return
 
-    _execute_provider_command(command, project_path, header, log_path)
+    # Retry loop with exponential backoff
+    last_error: Exception | None = None
+    for attempt in range(1, cfg.max_retries + 1):
+        try:
+            _execute_provider_command(command, project_path, header, log_path)
+            if attempt > 1:
+                logger.info(
+                    "Provider command succeeded on retry",
+                    extra={
+                        "extra_context": {
+                            "attempt": attempt,
+                            "spec_name": spec_name,
+                            "iteration": iteration,
+                        }
+                    },
+                )
+            return  # Success - exit retry loop
+        except RunnerError as err:
+            last_error = err
+            if attempt < cfg.max_retries:
+                # Calculate exponential backoff: 2^(attempt-1) seconds
+                backoff_seconds = 2 ** (attempt - 1)
+                logger.warning(
+                    "Provider command failed, retrying with backoff",
+                    extra={
+                        "extra_context": {
+                            "attempt": attempt,
+                            "max_retries": cfg.max_retries,
+                            "backoff_seconds": backoff_seconds,
+                            "spec_name": spec_name,
+                            "iteration": iteration,
+                            "error": str(err),
+                        }
+                    },
+                )
+                print(
+                    f"⚠️  Attempt {attempt}/{cfg.max_retries} failed. "
+                    f"Retrying in {backoff_seconds}s..."
+                )
+                time.sleep(backoff_seconds)
+            else:
+                logger.error(
+                    "Provider command failed after all retries",
+                    extra={
+                        "extra_context": {
+                            "attempts": attempt,
+                            "spec_name": spec_name,
+                            "iteration": iteration,
+                            "error": str(err),
+                        }
+                    },
+                )
+
+    # All retries exhausted - raise the last error
+    assert last_error is not None
+    raise last_error
 
 
 def _display_dry_run_spec_status(spec_name: str, spec_path: Path, stats: TaskStats) -> None:

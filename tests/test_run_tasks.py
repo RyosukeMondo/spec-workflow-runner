@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 from spec_workflow_runner import run_tasks as runner
 from spec_workflow_runner.providers import CodexProvider
-from spec_workflow_runner.utils import Config, TaskStats
+from spec_workflow_runner.utils import Config, RunnerError, TaskStats
 
 DEFAULT_PROMPT_TEMPLATE = "{spec_name}:{tasks_remaining}:{tasks_in_progress}"
 
@@ -352,3 +353,207 @@ def test_check_clean_working_tree_continues_on_choice_2(
 
     output = capsys.readouterr().out
     assert "Continuing with uncommitted changes" in output
+
+
+def test_run_provider_succeeds_on_first_attempt(tmp_path: Path, monkeypatch) -> None:
+    """Verify that run_provider succeeds without retry when command succeeds on first attempt."""
+    cfg = _make_config()
+    provider = CodexProvider()
+    log_path = tmp_path / "logs" / "task_1.log"
+
+    class DummyProcess:
+        def __init__(self) -> None:
+            self.stdout = io.BytesIO(b"success\n")
+            self.returncode = 0
+
+        def wait(self) -> None:
+            return None
+
+    def fake_popen(command, **kwargs):  # type: ignore[no-untyped-def]
+        return DummyProcess()
+
+    monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
+
+    # Should not raise
+    runner.run_provider(
+        provider,
+        cfg,
+        project_path=tmp_path,
+        prompt="test prompt",
+        dry_run=False,
+        spec_name="test-spec",
+        iteration=1,
+        log_path=log_path,
+    )
+
+
+def test_run_provider_retries_on_failure(tmp_path: Path, monkeypatch) -> None:
+    """Verify that run_provider retries when command fails initially."""
+    cfg = _make_config()
+    provider = CodexProvider()
+    log_path = tmp_path / "logs" / "task_1.log"
+
+    attempt_count = {"count": 0}
+
+    class DummyProcess:
+        def __init__(self) -> None:
+            attempt_count["count"] += 1
+            self.stdout = io.BytesIO(b"output\n")
+            # Fail on first attempt, succeed on second
+            self.returncode = 0 if attempt_count["count"] > 1 else 1
+
+        def wait(self) -> None:
+            return None
+
+    def fake_popen(command, **kwargs):  # type: ignore[no-untyped-def]
+        return DummyProcess()
+
+    mock_sleep = MagicMock()
+    monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(runner.time, "sleep", mock_sleep)
+
+    runner.run_provider(
+        provider,
+        cfg,
+        project_path=tmp_path,
+        prompt="test prompt",
+        dry_run=False,
+        spec_name="test-spec",
+        iteration=1,
+        log_path=log_path,
+    )
+
+    assert attempt_count["count"] == 2
+    # Should sleep once with 1 second backoff (2^(1-1) = 1)
+    mock_sleep.assert_called_once_with(1)
+
+
+def test_run_provider_exponential_backoff(tmp_path: Path, monkeypatch) -> None:
+    """Verify exponential backoff timing between retries."""
+    cfg = _make_config()
+    provider = CodexProvider()
+    log_path = tmp_path / "logs" / "task_1.log"
+
+    attempt_count = {"count": 0}
+
+    class DummyProcess:
+        def __init__(self) -> None:
+            attempt_count["count"] += 1
+            self.stdout = io.BytesIO(b"output\n")
+            # Succeed on third attempt
+            self.returncode = 0 if attempt_count["count"] >= 3 else 1
+
+        def wait(self) -> None:
+            return None
+
+    def fake_popen(command, **kwargs):  # type: ignore[no-untyped-def]
+        return DummyProcess()
+
+    sleep_calls: list[float] = []
+
+    def track_sleep(seconds: float) -> None:
+        sleep_calls.append(seconds)
+
+    monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(runner.time, "sleep", track_sleep)
+
+    runner.run_provider(
+        provider,
+        cfg,
+        project_path=tmp_path,
+        prompt="test prompt",
+        dry_run=False,
+        spec_name="test-spec",
+        iteration=1,
+        log_path=log_path,
+    )
+
+    assert attempt_count["count"] == 3
+    # Exponential backoff: 2^0=1, 2^1=2
+    assert sleep_calls == [1, 2]
+
+
+def test_run_provider_fails_after_max_retries(tmp_path: Path, monkeypatch) -> None:
+    """Verify that run_provider raises RunnerError after exhausting all retries."""
+    cfg = _make_config()
+    provider = CodexProvider()
+    log_path = tmp_path / "logs" / "task_1.log"
+
+    attempt_count = {"count": 0}
+
+    class DummyProcess:
+        def __init__(self) -> None:
+            attempt_count["count"] += 1
+            self.stdout = io.BytesIO(b"error\n")
+            self.returncode = 1  # Always fail
+
+        def wait(self) -> None:
+            return None
+
+    def fake_popen(command, **kwargs):  # type: ignore[no-untyped-def]
+        return DummyProcess()
+
+    mock_sleep = MagicMock()
+    monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(runner.time, "sleep", mock_sleep)
+
+    with pytest.raises(RunnerError, match="Provider command failed"):
+        runner.run_provider(
+            provider,
+            cfg,
+            project_path=tmp_path,
+            prompt="test prompt",
+            dry_run=False,
+            spec_name="test-spec",
+            iteration=1,
+            log_path=log_path,
+        )
+
+    # Should attempt max_retries times (default is 3)
+    assert attempt_count["count"] == 3
+    # Should sleep before retry 2 and retry 3: 1s, 2s
+    assert mock_sleep.call_count == 2
+
+
+def test_run_provider_logs_retry_attempts(tmp_path: Path, monkeypatch, caplog) -> None:
+    """Verify that retry attempts are logged correctly."""
+    import logging
+
+    caplog.set_level(logging.WARNING)
+
+    cfg = _make_config()
+    provider = CodexProvider()
+    log_path = tmp_path / "logs" / "task_1.log"
+
+    attempt_count = {"count": 0}
+
+    class DummyProcess:
+        def __init__(self) -> None:
+            attempt_count["count"] += 1
+            self.stdout = io.BytesIO(b"output\n")
+            # Succeed on second attempt
+            self.returncode = 0 if attempt_count["count"] > 1 else 1
+
+        def wait(self) -> None:
+            return None
+
+    def fake_popen(command, **kwargs):  # type: ignore[no-untyped-def]
+        return DummyProcess()
+
+    mock_sleep = MagicMock()
+    monkeypatch.setattr(runner.subprocess, "Popen", fake_popen)
+    monkeypatch.setattr(runner.time, "sleep", mock_sleep)
+
+    runner.run_provider(
+        provider,
+        cfg,
+        project_path=tmp_path,
+        prompt="test prompt",
+        dry_run=False,
+        spec_name="test-spec",
+        iteration=1,
+        log_path=log_path,
+    )
+
+    # Check that warning was logged for retry
+    assert any("retrying with backoff" in record.message.lower() for record in caplog.records)
