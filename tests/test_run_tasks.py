@@ -139,8 +139,8 @@ def test_list_unfinished_specs_filters_completed(tmp_path: Path) -> None:
     assert unfinished == [("alpha", alpha)]
 
 
-def test_list_unfinished_specs_sorts_by_ctime(tmp_path: Path) -> None:
-    """Verify that unfinished specs are sorted by spec directory creation time (oldest first)."""
+def test_list_unfinished_specs_sorts_by_mtime_desc(tmp_path: Path) -> None:
+    """Verify that unfinished specs are sorted by tasks.md modification time (newest first)."""
     import os
     import time
 
@@ -162,19 +162,19 @@ def test_list_unfinished_specs_sorts_by_ctime(tmp_path: Path) -> None:
     beta_tasks.write_text("- [ ] todo\n", encoding="utf-8")
     gamma_tasks.write_text("- [ ] todo\n", encoding="utf-8")
 
-    # Modify directories to set different ctimes (os.utime updates ctime as a side effect)
-    # The sleep delays ensure different ctime values
-    base_time = time.time() - 1000
-    os.utime(beta, (base_time, base_time))
-    time.sleep(0.01)  # Ensure different ctimes
-    os.utime(gamma, (base_time + 100, base_time + 100))
-    time.sleep(0.01)
-    os.utime(alpha, (base_time + 200, base_time + 200))
+    # Modify mtimes: 
+    # alpha: newest (now)
+    # beta: middle (now - 100s)
+    # gamma: oldest (now - 200s)
+    base_time = time.time()
+    os.utime(gamma_tasks, (base_time - 200, base_time - 200))
+    os.utime(beta_tasks, (base_time - 100, base_time - 100))
+    os.utime(alpha_tasks, (base_time, base_time))
 
     unfinished = runner.list_unfinished_specs(tmp_path, cfg)
 
-    # Should be sorted by directory ctime: beta (oldest), gamma, alpha (newest)
-    assert unfinished == [("beta", beta), ("gamma", gamma), ("alpha", alpha)]
+    # Should be sorted by mtime descending: alpha (newest), beta, gamma (oldest)
+    assert unfinished == [("alpha", alpha), ("beta", beta), ("gamma", gamma)]
 
 
 def test_run_all_specs_processes_each_unfinished_spec(tmp_path: Path, monkeypatch) -> None:
@@ -210,7 +210,7 @@ def test_run_all_specs_processes_each_unfinished_spec(tmp_path: Path, monkeypatc
 
     runner.run_all_specs(provider, cfg, tmp_path, dry_run=False)
 
-    assert seen == ["alpha", "beta"]
+    assert seen == ["beta", "alpha"]
 
 
 def test_ensure_provider_returns_explicit_value() -> None:

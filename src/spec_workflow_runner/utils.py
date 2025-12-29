@@ -516,8 +516,8 @@ def read_task_stats(tasks_path: Path) -> TaskStats:
 
 
 def list_unfinished_specs(project: Path, cfg: Config) -> list[tuple[str, Path]]:
-    """Return specs with unfinished tasks, sorted by directory creation time (oldest first)."""
-    unfinished_with_ctime: list[tuple[float, str, Path]] = []
+    """Return specs with unfinished tasks, sorted by tasks.md modification time (newest first)."""
+    unfinished_with_mtime: list[tuple[float, str, Path]] = []
     for name, spec_path in discover_specs(project, cfg):
         tasks_path = spec_path / cfg.tasks_filename
         if not tasks_path.exists():
@@ -526,14 +526,14 @@ def list_unfinished_specs(project: Path, cfg: Config) -> list[tuple[str, Path]]:
         if stats.total == 0:
             continue
         if stats.done < stats.total:
-            ctime = spec_path.stat().st_ctime
-            unfinished_with_ctime.append((ctime, name, spec_path))
+            mtime = tasks_path.stat().st_mtime
+            unfinished_with_mtime.append((mtime, name, spec_path))
 
-    # Sort by creation time (oldest first)
-    unfinished_with_ctime.sort(key=lambda x: x[0])
+    # Sort by modification time (newest first)
+    unfinished_with_mtime.sort(key=lambda x: x[0], reverse=True)
 
     # Return without the timestamp
-    return [(name, spec_path) for _, name, spec_path in unfinished_with_ctime]
+    return [(name, spec_path) for _, name, spec_path in unfinished_with_mtime]
 
 
 def display_spec_queue(project: Path, cfg: Config) -> None:
@@ -547,37 +547,38 @@ def display_spec_queue(project: Path, cfg: Config) -> None:
     specs_with_metadata: list[tuple[int, str, Path, float, bool]] = []
     for idx, (name, spec_path) in enumerate(all_specs, start=1):
         tasks_path = spec_path / cfg.tasks_filename
-        ctime = spec_path.stat().st_ctime
-
+        
         if tasks_path.exists():
+            mtime = tasks_path.stat().st_mtime
             stats = read_task_stats(tasks_path)
             has_work = stats.total > 0 and stats.done < stats.total
         else:
+            mtime = 0.0
             has_work = False
 
-        specs_with_metadata.append((idx, name, spec_path, ctime, has_work))
+        specs_with_metadata.append((idx, name, spec_path, mtime, has_work))
 
-    # Sort by creation time (oldest first) but keep original indices
-    unfinished = [(idx, name, path, ctime) for idx, name, path, ctime, has_work
+    # Sort by modification time (newest first) but keep original indices
+    unfinished = [(idx, name, path, mtime) for idx, name, path, mtime, has_work
                   in specs_with_metadata if has_work]
-    unfinished.sort(key=lambda x: x[3])  # Sort by ctime
+    unfinished.sort(key=lambda x: x[3], reverse=True)  # Sort by mtime descending
 
     if not unfinished:
         print("\n✓ No unfinished specs found. All specs are complete!")
         return
 
     print(f"\n{'='*90}")
-    print(f"Unfinished Specs Queue (sorted by creation time, oldest first)")
+    print(f"Unfinished Specs Queue (sorted by last active, newest first)")
     print(f"{'='*90}")
-    print(f"{'#':<6}{'Spec Name':<40}{'Status':<25}{'Created'}")
+    print(f"{'#':<6}{'Spec Name':<40}{'Status':<25}{'Last Active'}")
     print(f"{'-'*90}")
 
-    for idx, name, spec_path, ctime in unfinished:
+    for idx, name, spec_path, mtime in unfinished:
         tasks_path = spec_path / cfg.tasks_filename
         stats = read_task_stats(tasks_path)
-        created_date = datetime.fromtimestamp(ctime).strftime("%Y-%m-%d %H:%M")
+        last_active = datetime.fromtimestamp(mtime).strftime("%Y-%m-%d %H:%M")
         status = f"{stats.done}/{stats.total} tasks ({stats.in_progress} in progress)"
-        print(f"{idx:<6}{name:<40}{status:<25}{created_date}")
+        print(f"{idx:<6}{name:<40}{status:<25}{last_active}")
 
     print(f"{'-'*90}")
     print(f"Total: {len(unfinished)} unfinished spec(s)")
