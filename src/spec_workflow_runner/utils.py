@@ -532,7 +532,7 @@ def read_task_stats(tasks_path: Path) -> TaskStats:
 
 
 def list_unfinished_specs(project: Path, cfg: Config) -> list[tuple[str, Path]]:
-    """Return specs with unfinished tasks, sorted by directory creation time (oldest first)."""
+    """Return specs with unfinished tasks, sorted by requirements.md creation time (oldest first)."""
     unfinished_with_ctime: list[tuple[float, str, Path]] = []
     for name, spec_path in discover_specs(project, cfg):
         tasks_path = spec_path / cfg.tasks_filename
@@ -542,7 +542,12 @@ def list_unfinished_specs(project: Path, cfg: Config) -> list[tuple[str, Path]]:
         if stats.total == 0:
             continue
         if stats.done < stats.total:
-            ctime = spec_path.stat().st_ctime
+            # Use requirements.md creation time, fallback to directory creation time
+            requirements_path = spec_path / "requirements.md"
+            if requirements_path.exists():
+                ctime = requirements_path.stat().st_ctime
+            else:
+                ctime = spec_path.stat().st_ctime
             unfinished_with_ctime.append((ctime, name, spec_path))
 
     # Sort by creation time (oldest first)
@@ -563,7 +568,12 @@ def display_spec_queue(project: Path, cfg: Config) -> None:
     specs_with_metadata: list[tuple[int, str, Path, float, bool]] = []
     for idx, (name, spec_path) in enumerate(all_specs, start=1):
         tasks_path = spec_path / cfg.tasks_filename
-        ctime = spec_path.stat().st_ctime
+        # Use requirements.md creation time, fallback to directory creation time
+        requirements_path = spec_path / "requirements.md"
+        if requirements_path.exists():
+            ctime = requirements_path.stat().st_ctime
+        else:
+            ctime = spec_path.stat().st_ctime
 
         if tasks_path.exists():
             stats = read_task_stats(tasks_path)
