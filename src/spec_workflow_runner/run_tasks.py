@@ -31,6 +31,7 @@ from .utils import (
     list_unfinished_specs,
     load_config,
     read_task_stats,
+    reduce_spec_context,
 )
 
 logger = logging.getLogger(__name__)
@@ -489,7 +490,26 @@ def run_provider(
             is_context_error = is_context_limit_error(error_message)
 
             if is_context_error:
-                # Use configured wait time for context limit errors (default: 10 minutes)
+                # Try to reduce context by archiving implementation logs
+                print("⚠️  Context limit exceeded. Attempting to reduce context...")
+                context_reduced = reduce_spec_context(project_path, spec_name, cfg)
+
+                if context_reduced:
+                    logger.info(
+                        "Context reduced by archiving logs, retrying immediately",
+                        extra={
+                            "extra_context": {
+                                "attempt": attempt,
+                                "spec_name": spec_name,
+                                "iteration": iteration,
+                            }
+                        },
+                    )
+                    print("✓ Context reduced by archiving implementation logs. Retrying...")
+                    # Retry immediately after reducing context
+                    continue
+
+                # If context couldn't be reduced, wait before retrying
                 backoff_seconds = cfg.context_limit_wait_seconds
                 wait_minutes = backoff_seconds // 60
                 logger.warning(
@@ -507,7 +527,7 @@ def run_provider(
                     },
                 )
                 print(
-                    f"⚠️  Context limit exceeded. "
+                    f"⚠️  Context limit exceeded (no logs to archive). "
                     f"Waiting {wait_minutes} minutes ({backoff_seconds}s) before retry..."
                 )
                 time.sleep(backoff_seconds)

@@ -26,7 +26,7 @@ def is_context_limit_error(error_message: str) -> bool:
     """Detect if an error is due to context limit/window exceeded.
 
     Checks for common error patterns from different LLM providers:
-    - Claude: "context limit", "exceed context", "context window"
+    - Claude: "context limit", "exceed context", "context window", "prompt is too long"
     - OpenAI: "context_length_exceeded", "exceeds the context window"
     - Gemini: "RESOURCE_EXHAUSTED" (context-related)
 
@@ -47,6 +47,8 @@ def is_context_limit_error(error_message: str) -> bool:
         return True
     if "hit your limit" in error_lower:
         return True
+    if "prompt is too long" in error_lower:
+        return True
 
     # OpenAI error patterns
     if "context_length_exceeded" in error_lower:
@@ -61,6 +63,80 @@ def is_context_limit_error(error_message: str) -> bool:
         return True
 
     return False
+
+
+def reduce_spec_context(project_path: Path, spec_name: str, cfg: Config) -> bool:
+    """Reduce context size by archiving implementation logs and updating .claudeignore.
+
+    Args:
+        project_path: Path to the project root
+        spec_name: Name of the spec
+        cfg: Configuration object
+
+    Returns:
+        True if context was reduced, False if no logs to archive
+    """
+    import logging
+    import shutil
+
+    logger = logging.getLogger(__name__)
+
+    spec_dir = project_path / cfg.spec_workflow_dir_name / cfg.specs_subdir / spec_name
+    impl_logs_dir = spec_dir / "Implementation Logs"
+
+    if not impl_logs_dir.exists():
+        return False
+
+    # Check if there are any logs to archive
+    log_files = list(impl_logs_dir.glob("*.md"))
+    if not log_files:
+        return False
+
+    # Create archive directory
+    archive_dir = project_path / cfg.spec_workflow_dir_name / "archived-logs" / spec_name
+    archive_dir.mkdir(parents=True, exist_ok=True)
+
+    # Move all logs to archive
+    moved_count = 0
+    for log_file in log_files:
+        try:
+            shutil.move(str(log_file), str(archive_dir / log_file.name))
+            moved_count += 1
+        except Exception as e:
+            logger.warning(f"Failed to archive {log_file.name}: {e}")
+
+    logger.info(f"Archived {moved_count} implementation logs to {archive_dir}")
+
+    # Create README in Implementation Logs directory
+    readme_path = impl_logs_dir / "README.md"
+    readme_path.write_text(
+        "# Archived Implementation Logs\n\n"
+        "These logs have been moved to reduce context size for the AI runner.\n"
+        f"Original logs are in: .spec-workflow/archived-logs/{spec_name}/\n"
+    )
+
+    # Update or create .claudeignore
+    claudeignore_path = project_path / ".claudeignore"
+    ignore_patterns = {
+        ".spec-workflow/specs/*/Implementation Logs/",
+        ".spec-workflow/archived-logs/",
+        "logs/",
+    }
+
+    existing_patterns = set()
+    if claudeignore_path.exists():
+        existing_patterns = set(line.strip() for line in claudeignore_path.read_text().splitlines() if line.strip())
+
+    new_patterns = ignore_patterns - existing_patterns
+    if new_patterns:
+        with claudeignore_path.open("a") as f:
+            if existing_patterns:
+                f.write("\n")
+            for pattern in sorted(new_patterns):
+                f.write(f"{pattern}\n")
+        logger.info(f"Updated .claudeignore with {len(new_patterns)} new patterns")
+
+    return True
 
 
 def get_current_commit(repo_path: Path) -> str:

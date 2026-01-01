@@ -23,6 +23,10 @@ def test_is_context_limit_error_detects_claude_errors() -> None:
     # Claude error pattern 4 (Rate limit / Daily limit)
     assert is_context_limit_error("You've hit your limit · resets 3am (Asia/Tokyo)")
 
+    # Claude CLI error pattern (prompt too long)
+    assert is_context_limit_error("Prompt is too long")
+    assert is_context_limit_error("Provider command failed. Output: Prompt is too long")
+
 
 def test_is_context_limit_error_detects_openai_errors() -> None:
     """Verify detection of OpenAI context limit errors."""
