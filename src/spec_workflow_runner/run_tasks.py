@@ -14,7 +14,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TextIO
 
-from .providers import Provider, create_provider, get_supported_models
+from .providers import ClaudeProvider, Provider, create_provider, get_supported_models
 from .utils import (
     Config,
     RunnerError,
@@ -25,13 +25,16 @@ from .utils import (
     discover_projects,
     discover_specs,
     display_spec_queue,
+    get_active_claude_account,
     get_current_commit,
     has_uncommitted_changes,
     is_context_limit_error,
+    is_rate_limit_error,
     list_unfinished_specs,
     load_config,
     read_task_stats,
     reduce_spec_context,
+    rotate_claude_account,
 )
 
 logger = logging.getLogger(__name__)
@@ -281,18 +284,24 @@ def run_all_specs(
     project: Path,
     dry_run: bool,
 ) -> None:
-    """Sequentially run provider for every unfinished spec until all complete."""
+    """Sequentially run provider for every unfinished spec, polling every 10 minutes when all complete."""
     if dry_run:
         print("\n[DRY-RUN MODE] Displaying spec queue without executing...")
         display_spec_queue(project, cfg)
+        print("\n[DRY-RUN MODE] Would continuously poll every 10 minutes for new specs after all tasks complete.")
         return
 
     print("\nRunning unfinished specs in sequence.")
+    print("Will poll every 10 minutes for new specs when all tasks are complete.\n")
+
     while True:
         unfinished = list_unfinished_specs(project, cfg)
         if not unfinished:
-            print("No unfinished specs remaining. All caught up!")
-            return
+            current_time = datetime.now().strftime("%H:%M:%S")
+            print(f"\n[{current_time}] No unfinished specs remaining. All caught up!")
+            print("Polling every 10 minutes for new specs. Press Ctrl+C to stop.")
+            time.sleep(600)  # 10 minutes = 600 seconds
+            continue
         spec_name, spec_path = unfinished[0]
         print(f"\n==> Processing spec '{spec_name}'")
         run_loop(provider, cfg, project, spec_name, spec_path, dry_run)
@@ -466,7 +475,8 @@ def run_provider(
     # Retry loop with exponential backoff
     last_error: Exception | None = None
     attempt = 1
-    
+    starting_claude_account: str | None = None  # Track starting account for rotation cycle
+
     while True:
         try:
             _execute_provider_command(command, project_path, header, log_path)
@@ -484,11 +494,87 @@ def run_provider(
             return  # Success - exit retry loop
         except RunnerError as err:
             last_error = err
-            
-            # Check if this is a context limit error
+
+            # Check error type
             error_message = str(err)
+            is_rate_error = is_rate_limit_error(error_message)
             is_context_error = is_context_limit_error(error_message)
 
+            # Handle rate limit errors
+            if is_rate_error:
+                logger.warning(
+                    "Rate limit exceeded, waiting before retry",
+                    extra={
+                        "extra_context": {
+                            "attempt": attempt,
+                            "spec_name": spec_name,
+                            "iteration": iteration,
+                            "error": error_message,
+                        }
+                    },
+                )
+
+                # For Claude provider: try rotating accounts
+                if isinstance(provider, ClaudeProvider):
+                    if starting_claude_account is None:
+                        starting_claude_account = get_active_claude_account()
+                        logger.info(f"Tracking starting Claude account: {starting_claude_account}")
+
+                    print("⚠️  Rate limit exceeded. Rotating Claude account...")
+                    if rotate_claude_account():
+                        current_account = get_active_claude_account()
+
+                        # Check if we've cycled through all accounts
+                        if current_account == starting_claude_account:
+                            logger.warning(
+                                "All Claude accounts exhausted, waiting before retry",
+                                extra={
+                                    "extra_context": {
+                                        "starting_account": starting_claude_account,
+                                        "spec_name": spec_name,
+                                        "iteration": iteration,
+                                    }
+                                },
+                            )
+                            backoff_seconds = cfg.context_limit_wait_seconds
+                            wait_minutes = backoff_seconds // 60
+                            print(
+                                f"⚠️  All Claude accounts exhausted. "
+                                f"Waiting {wait_minutes} minutes ({backoff_seconds}s) before retry..."
+                            )
+                            time.sleep(backoff_seconds)
+                            # Reset starting account for next cycle
+                            starting_claude_account = get_active_claude_account()
+                        else:
+                            logger.info(
+                                f"Rotated to Claude account: {current_account}, retrying",
+                                extra={
+                                    "extra_context": {
+                                        "current_account": current_account,
+                                        "starting_account": starting_claude_account,
+                                        "spec_name": spec_name,
+                                        "iteration": iteration,
+                                    }
+                                },
+                            )
+                        # Retry with new account
+                        continue
+                    else:
+                        # Rotation failed, fall through to wait
+                        print("⚠️  Account rotation not available. Falling back to wait...")
+
+                # For non-Claude providers or if rotation not available: wait before retrying
+                backoff_seconds = cfg.context_limit_wait_seconds
+                wait_minutes = backoff_seconds // 60
+                print(
+                    f"⚠️  Rate limit exceeded. "
+                    f"Waiting {wait_minutes} minutes ({backoff_seconds}s) before retry..."
+                )
+                time.sleep(backoff_seconds)
+                # Do not increment attempt for rate limits - retry infinitely
+                continue
+
+            # Handle context limit errors
             if is_context_error:
                 # Try to reduce context by archiving implementation logs
                 print("⚠️  Context limit exceeded. Attempting to reduce context...")
@@ -509,7 +595,58 @@ def run_provider(
                     # Retry immediately after reducing context
                     continue
 
-                # If context couldn't be reduced, wait before retrying
+                # For Claude provider: rotate accounts before waiting
+                if isinstance(provider, ClaudeProvider):
+                    # Track starting account on first context limit hit
+                    if starting_claude_account is None:
+                        starting_claude_account = get_active_claude_account()
+                        logger.info(f"Tracking starting Claude account: {starting_claude_account}")
+
+                    # Rotate to next account
+                    print("⚠️  Context limit exceeded. Rotating Claude account...")
+                    if rotate_claude_account():
+                        current_account = get_active_claude_account()
+
+                        # Check if we've cycled through all accounts
+                        if current_account == starting_claude_account:
+                            logger.warning(
+                                "All Claude accounts exhausted, waiting before retry",
+                                extra={
+                                    "extra_context": {
+                                        "starting_account": starting_claude_account,
+                                        "spec_name": spec_name,
+                                        "iteration": iteration,
+                                    }
+                                },
+                            )
+                            backoff_seconds = cfg.context_limit_wait_seconds
+                            wait_minutes = backoff_seconds // 60
+                            print(
+                                f"⚠️  All Claude accounts exhausted. "
+                                f"Waiting {wait_minutes} minutes ({backoff_seconds}s) before retry..."
+                            )
+                            time.sleep(backoff_seconds)
+                            # Reset starting account for next cycle
+                            starting_claude_account = get_active_claude_account()
+                        else:
+                            logger.info(
+                                f"Rotated to Claude account: {current_account}, retrying",
+                                extra={
+                                    "extra_context": {
+                                        "current_account": current_account,
+                                        "starting_account": starting_claude_account,
+                                        "spec_name": spec_name,
+                                        "iteration": iteration,
+                                    }
+                                },
+                            )
+                        # Retry with new account
+                        continue
+                    else:
+                        # Rotation failed, fall through to wait
+                        print("⚠️  Account rotation failed. Falling back to wait...")
+
+                # For non-Claude providers or if rotation failed: wait before retrying
                 backoff_seconds = cfg.context_limit_wait_seconds
                 wait_minutes = backoff_seconds // 60
                 logger.warning(
@@ -687,7 +824,7 @@ def main() -> int:
 
         if not args.dry_run:
             check_clean_working_tree(project)
-            check_mcp_server_exists(provider, project)
+            check_mcp_server_exists(provider, project, cfg, auto_install=True)
 
         selection = _choose_spec_or_all(project, cfg, args.spec)
         if isinstance(selection, AllSpecsSentinel):

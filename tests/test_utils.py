@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from spec_workflow_runner.utils import is_context_limit_error
+from spec_workflow_runner.utils import is_context_limit_error, is_rate_limit_error
 
 
 def test_is_context_limit_error_detects_claude_errors() -> None:
@@ -19,9 +19,6 @@ def test_is_context_limit_error_detects_claude_errors() -> None:
 
     # Claude error pattern 3
     assert is_context_limit_error("Error: exceed context limit")
-
-    # Claude error pattern 4 (Rate limit / Daily limit)
-    assert is_context_limit_error("You've hit your limit · resets 3am (Asia/Tokyo)")
 
     # Claude CLI error pattern (prompt too long)
     assert is_context_limit_error("Prompt is too long")
@@ -86,3 +83,63 @@ def test_is_context_limit_error_handles_multiline_errors() -> None:
     Please reduce your input size
     """
     assert is_context_limit_error(multiline_error)
+
+
+def test_is_rate_limit_error_detects_claude_errors() -> None:
+    """Verify detection of Claude rate limit errors."""
+    # Claude rate limit pattern (daily limit)
+    assert is_rate_limit_error("You've hit your limit · resets 3am (Asia/Tokyo)")
+    assert is_rate_limit_error("You've hit your limit · resets 11pm (Asia/Tokyo)")
+
+    # Claude rate limit pattern (generic)
+    assert is_rate_limit_error("Rate limit exceeded")
+    assert is_rate_limit_error("Too many requests")
+
+
+def test_is_rate_limit_error_detects_openai_errors() -> None:
+    """Verify detection of OpenAI rate limit errors."""
+    # OpenAI rate limit patterns
+    assert is_rate_limit_error("Error: rate_limit_exceeded")
+    assert is_rate_limit_error("Quota exceeded for your organization")
+    assert is_rate_limit_error("HTTP 429 Too Many Requests")
+
+
+def test_is_rate_limit_error_detects_http_429() -> None:
+    """Verify detection of HTTP 429 status code."""
+    assert is_rate_limit_error("Request failed with status 429")
+    assert is_rate_limit_error("Error 429: Too Many Requests")
+
+
+def test_is_rate_limit_error_case_insensitive() -> None:
+    """Verify that rate limit detection is case-insensitive."""
+    assert is_rate_limit_error("RATE LIMIT EXCEEDED")
+    assert is_rate_limit_error("Rate Limit Exceeded")
+    assert is_rate_limit_error("rate limit exceeded")
+    assert is_rate_limit_error("TOO MANY REQUESTS")
+
+
+def test_is_rate_limit_error_rejects_non_rate_errors() -> None:
+    """Verify that non-rate errors are not detected as rate limit errors."""
+    # Context limit errors should not be detected as rate limit
+    assert not is_rate_limit_error("Context limit exceeded")
+    assert not is_rate_limit_error("Exceeds context window")
+    assert not is_rate_limit_error("Prompt is too long")
+
+    # Other generic errors
+    assert not is_rate_limit_error("Connection timeout")
+    assert not is_rate_limit_error("Invalid API key")
+    assert not is_rate_limit_error("Authentication failed")
+
+    # Empty string
+    assert not is_rate_limit_error("")
+
+
+def test_is_rate_limit_error_handles_multiline_errors() -> None:
+    """Verify detection in multiline error messages."""
+    multiline_error = """
+    API Error occurred:
+    Error Code: 429
+    Message: You've hit your limit · resets 11pm (Asia/Tokyo)
+    Please try again later
+    """
+    assert is_rate_limit_error(multiline_error)

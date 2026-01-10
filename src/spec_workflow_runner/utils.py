@@ -22,6 +22,39 @@ class RunnerError(Exception):
     """Raised when the run needs to abort early."""
 
 
+def is_rate_limit_error(error_message: str) -> bool:
+    """Detect if an error is due to rate limit/quota exceeded.
+
+    Checks for common rate limit patterns from different LLM providers:
+    - Claude: "hit your limit", "rate limit", "too many requests"
+    - OpenAI: "rate_limit_exceeded", "quota exceeded"
+    - Gemini: "RESOURCE_EXHAUSTED" (rate-related)
+
+    Args:
+        error_message: The error message string to check
+
+    Returns:
+        True if the error is a rate limit error, False otherwise
+    """
+    error_lower = error_message.lower()
+
+    # Rate limit patterns
+    if "hit your limit" in error_lower:
+        return True
+    if "rate limit" in error_lower:
+        return True
+    if "rate_limit" in error_lower:
+        return True
+    if "too many requests" in error_lower:
+        return True
+    if "quota exceeded" in error_lower:
+        return True
+    if "429" in error_message:  # HTTP 429 Too Many Requests
+        return True
+
+    return False
+
+
 def is_context_limit_error(error_message: str) -> bool:
     """Detect if an error is due to context limit/window exceeded.
 
@@ -44,8 +77,6 @@ def is_context_limit_error(error_message: str) -> bool:
     if "exceed context" in error_lower or "exceeds context" in error_lower:
         return True
     if "context window" in error_lower:
-        return True
-    if "hit your limit" in error_lower:
         return True
     if "prompt is too long" in error_lower:
         return True
@@ -163,20 +194,23 @@ def has_uncommitted_changes(repo_path: Path) -> bool:
     return bool(result.stdout.strip())
 
 
-def _install_mcp_server(provider: Provider, project_path: Path, non_interactive: bool) -> None:
+def _install_mcp_server(
+    provider: Provider, project_path: Path, cfg: Config, non_interactive: bool
+) -> None:
     """Install spec-workflow MCP server for the provider.
 
     Args:
         provider: Provider instance
         project_path: Path to project directory
+        cfg: Configuration object with MCP settings
         non_interactive: If True, install without prompting
     """
     import logging
 
     logger = logging.getLogger(__name__)
 
-    server_name = "spec-workflow"
-    package = "npx @pimzino/spec-workflow-mcp@latest"
+    server_name = cfg.mcp_server_name
+    package = cfg.mcp_package
     executable = provider.get_mcp_list_command().executable
 
     # Prompt user for confirmation in interactive mode
@@ -261,18 +295,24 @@ def check_clean_working_tree(repo_path: Path, non_interactive: bool = False) -> 
 
 
 def check_mcp_server_exists(
-    provider: Provider, project_path: Path, auto_install: bool = False, non_interactive: bool = False
+    provider: Provider,
+    project_path: Path,
+    cfg: Config,
+    auto_install: bool = False,
+    non_interactive: bool = False,
 ) -> None:
     """Ensure spec-workflow MCP server is configured for the provider.
 
     Args:
         provider: Provider instance
         project_path: Path to project directory
+        cfg: Configuration object with MCP settings
         auto_install: If True, automatically install MCP server if not found
         non_interactive: If True, don't prompt user for installation confirmation
     """
     mcp_cmd = provider.get_mcp_list_command()
     command = mcp_cmd.to_list()
+    server_name = cfg.mcp_server_name
 
     try:
         result = subprocess.run(
@@ -287,28 +327,28 @@ def check_mcp_server_exists(
             print(f"\n⚠️  Warning: Could not list MCP servers for {provider.get_provider_name()}.")
             print(f"   Command failed: {' '.join(command)}")
             print(f"   Error: {result.stderr.strip()}")
-            print("\n   Task tracking may not work properly without the spec-workflow MCP server.")
+            print(f"\n   Task tracking may not work properly without the {server_name} MCP server.")
             return
 
         output = result.stdout.lower()
-        if "spec-workflow" not in output:
+        if server_name.lower() not in output:
             # MCP server not found - attempt to install if enabled
             if auto_install:
-                _install_mcp_server(provider, project_path, non_interactive)
+                _install_mcp_server(provider, project_path, cfg, non_interactive)
                 return
 
             executable = provider.get_mcp_list_command().executable
             print(f"\n🔍 DEBUG: MCP list output (first 300 chars):")
             print(f"   {repr(result.stdout[:300])}")
-            print(f"   Lowercase contains 'spec-workflow': {'spec-workflow' in output}")
+            print(f"   Lowercase contains '{server_name}': {server_name.lower() in output}")
             raise RunnerError(
-                f"spec-workflow MCP server not found for {provider.get_provider_name()}.\n"
-                f"   The spec-workflow MCP server is required for automatic task tracking.\n"
-                f"   Please configure it by running: {executable} mcp add spec-workflow npx @pimzino/spec-workflow-mcp@latest\n"
+                f"{server_name} MCP server not found for {provider.get_provider_name()}.\n"
+                f"   The {server_name} MCP server is required for automatic task tracking.\n"
+                f"   Please configure it by running: {executable} mcp add {server_name} {cfg.mcp_package}\n"
                 f"   Or check your MCP server configuration."
             )
 
-        print(f"✓ spec-workflow MCP server detected for {provider.get_provider_name()}")
+        print(f"✓ {server_name} MCP server detected for {provider.get_provider_name()}")
 
     except FileNotFoundError as err:
         executable = provider.get_mcp_list_command().executable
@@ -316,6 +356,65 @@ def check_mcp_server_exists(
             f"{executable} command not found.\n"
             f"   Please ensure {provider.get_provider_name()} is installed and available in PATH."
         ) from err
+
+
+def get_active_claude_account() -> str | None:
+    """Get the currently active Claude account name.
+
+    Returns:
+        The name of the active account, or None if not found.
+    """
+    try:
+        result = subprocess.run(
+            ["claude-account"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if result.returncode == 0:
+            return result.stdout.strip()
+        return None
+    except FileNotFoundError:
+        return None
+
+
+def rotate_claude_account() -> bool:
+    """Rotate to the next available Claude account.
+
+    Runs 'claude-rotate' command to switch to the next authenticated account.
+
+    Returns:
+        True if rotation was successful, False otherwise.
+    """
+    import logging
+
+    logger = logging.getLogger(__name__)
+
+    try:
+        result = subprocess.run(
+            ["claude-rotate"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+
+        if result.returncode == 0:
+            new_account = get_active_claude_account()
+            logger.info(f"Rotated to Claude account: {new_account}")
+            print(f"✓ Rotated to Claude account: {new_account}")
+            return True
+
+        logger.warning(f"Failed to rotate Claude account: {result.stderr.strip()}")
+        print(f"⚠️  Failed to rotate Claude account: {result.stderr.strip()}")
+        return False
+
+    except FileNotFoundError:
+        logger.info(
+            "claude-rotate command not found. "
+            "Install it to enable automatic account rotation for rate limit handling. "
+            "See: https://github.com/anthropics/claude-code#account-rotation"
+        )
+        return False
 
 
 def _encode_override_value(value: object) -> str:
@@ -354,6 +453,8 @@ class Config:
     tui_min_terminal_rows: int = 24
     max_retries: int = 3
     context_limit_wait_seconds: int = 600
+    mcp_server_name: str = "spec-workflow"
+    mcp_package: str = "npx @pimzino/spec-workflow-mcp@latest"
 
     @classmethod
     def from_dict(cls, payload: dict) -> Config:
@@ -397,6 +498,16 @@ class Config:
                 f"context_limit_wait_seconds must be positive, got {context_limit_wait_seconds}"
             )
 
+        # MCP config: env vars take precedence over config.json, with defaults
+        mcp_server_name = os.environ.get(
+            "MCP_SERVER_NAME",
+            payload.get("mcp_server_name", "spec-workflow"),
+        )
+        mcp_package = os.environ.get(
+            "MCP_PACKAGE",
+            payload.get("mcp_package", "npx @pimzino/spec-workflow-mcp@latest"),
+        )
+
         return cls(
             repos_root=repos_root,
             spec_workflow_dir_name=payload["spec_workflow_dir_name"],
@@ -418,6 +529,8 @@ class Config:
             tui_min_terminal_rows=tui_min_terminal_rows,
             max_retries=max_retries,
             context_limit_wait_seconds=context_limit_wait_seconds,
+            mcp_server_name=mcp_server_name,
+            mcp_package=mcp_package,
         )
 
 
