@@ -7,6 +7,7 @@ starting, stopping, monitoring health, and detecting commits.
 from __future__ import annotations
 
 import logging
+import os
 import signal
 import subprocess
 import time
@@ -105,11 +106,11 @@ class RunnerManager:
         Raises:
             Exception: If preconditions are not met
         """
-        # Check for clean working tree (non-interactive mode for TUI)
-        check_clean_working_tree(project_path, non_interactive=True)
+        # Check for clean working tree (warns only)
+        check_clean_working_tree(project_path)
 
-        # Check for MCP server and auto-install if not found (non-interactive for TUI)
-        check_mcp_server_exists(provider, project_path, auto_install=True, non_interactive=True)
+        # Check for MCP server and auto-install if not found
+        check_mcp_server_exists(provider, project_path, self.config)
 
     def start_runner(
         self,
@@ -185,12 +186,20 @@ class RunnerManager:
 
         # Open log file and keep it open for the duration of the process
         log_file = log_path.open("w", encoding="utf-8", buffering=1)  # Line buffered
+
+        # Clear Claude-specific env vars to avoid nested Claude Code session conflicts
+        env = os.environ.copy()
+        for key in list(env.keys()):
+            if key.startswith("CLAUDE") or key.startswith("CLAUDE_"):
+                del env[key]
+
         process = subprocess.Popen(
             cmd_list,
             cwd=project_path,
             stdout=log_file,
             stderr=subprocess.STDOUT,
             text=True,
+            env=env,
         )
 
         # Create runner state

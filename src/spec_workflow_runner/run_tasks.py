@@ -421,6 +421,10 @@ def _execute_provider_command(command: list[str], project_path: Path, header: st
 
     env = os.environ.copy()
     env["PYTHONUNBUFFERED"] = "1"
+    # Clear Claude-specific env vars to avoid nested Claude Code session conflicts
+    for key in list(env.keys()):
+        if key.startswith("CLAUDE") or key.startswith("CLAUDE_"):
+            del env[key]
 
     output_lines: list[str] = []
     with log_path.open("w", encoding="utf-8") as handle:
@@ -824,7 +828,7 @@ def main() -> int:
 
         if not args.dry_run:
             check_clean_working_tree(project)
-            check_mcp_server_exists(provider, project, cfg, auto_install=True)
+            check_mcp_server_exists(provider, project, cfg)
 
         selection = _choose_spec_or_all(project, cfg, args.spec)
         if isinstance(selection, AllSpecsSentinel):

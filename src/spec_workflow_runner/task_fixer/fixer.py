@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -136,12 +137,19 @@ class TaskFixer:
                 config_overrides=(),
             )
 
+            # Clear Claude-specific env vars to avoid nested Claude Code session conflicts
+            env = os.environ.copy()
+            for key in list(env.keys()):
+                if key.startswith("CLAUDE") or key.startswith("CLAUDE_"):
+                    del env[key]
+
             result = subprocess.run(
                 command.to_list(),
                 capture_output=True,
                 text=True,
                 timeout=self._subprocess_timeout,
                 cwd=project_path,
+                env=env,
             )
 
             if result.returncode != 0:
