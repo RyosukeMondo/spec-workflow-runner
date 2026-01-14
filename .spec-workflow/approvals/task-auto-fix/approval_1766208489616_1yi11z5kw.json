@@ -3,8 +3,10 @@
   "title": "Requirements for task-auto-fix spec",
   "filePath": ".spec-workflow/specs/task-auto-fix/requirements.md",
   "type": "document",
-  "status": "pending",
+  "status": "approved",
   "createdAt": "2025-12-20T05:28:09.617Z",
   "category": "spec",
-  "categoryName": "task-auto-fix"
+  "categoryName": "task-auto-fix",
+  "response": "ダッシュボードから承認",
+  "respondedAt": "2026-01-02T14:36:04.175Z"
 }

@@ -12,6 +12,8 @@
   "monitor_refresh_seconds": 5,
   "cache_dir": "~/.cache/spec-workflow-runner",
   "cache_max_age_days": 7,
+  "mcp_server_name": "spec-workflow",
+  "mcp_package": "npx @pimzino/spec-workflow-mcp@latest",
   "codex_config_overrides": {
     "mcp_servers.spec-workflow.tool_timeout_sec": 60,
     "mcp_servers.spec-workflow.startup_timeout_sec": 60

@@ -194,16 +194,13 @@ def has_uncommitted_changes(repo_path: Path) -> bool:
     return bool(result.stdout.strip())
 
 
-def _install_mcp_server(
-    provider: Provider, project_path: Path, cfg: Config, non_interactive: bool
-) -> None:
+def _install_mcp_server(provider: Provider, project_path: Path, cfg: Config) -> None:
     """Install spec-workflow MCP server for the provider.
 
     Args:
         provider: Provider instance
         project_path: Path to project directory
         cfg: Configuration object with MCP settings
-        non_interactive: If True, install without prompting
     """
     import logging
 
@@ -211,31 +208,13 @@ def _install_mcp_server(
 
     server_name = cfg.mcp_server_name
     package = cfg.mcp_package
-    executable = provider.get_mcp_list_command().executable
 
-    # Prompt user for confirmation in interactive mode
-    if not non_interactive:
-        print(f"\n📦 spec-workflow MCP server not found for {provider.get_provider_name()}.")
-        print(f"   Would you like to install it now?")
-        print(f"\n   Command: {executable} mcp add {server_name} {package}")
-
-        while True:
-            choice = input("\nInstall MCP server? (y/n): ").strip().lower()
-            if choice == "n":
-                raise RunnerError(
-                    f"spec-workflow MCP server is required. "
-                    f"Please install it manually: {executable} mcp add {server_name} {package}"
-                )
-            if choice == "y":
-                break
-            print("Invalid choice. Please enter 'y' or 'n'.")
-
-    # Install MCP server
+    # Install MCP server automatically
     add_cmd = provider.get_mcp_add_command(server_name, package)
     command = add_cmd.to_list()
 
     logger.info(f"Installing MCP server: {' '.join(command)}")
-    print(f"\n📦 Installing spec-workflow MCP server for {provider.get_provider_name()}...")
+    print(f"\n📦 Auto-installing spec-workflow MCP server for {provider.get_provider_name()}...")
 
     try:
         result = subprocess.run(
@@ -260,55 +239,32 @@ def _install_mcp_server(
         raise RunnerError(f"Failed to install spec-workflow MCP server: {err}") from err
 
 
-def check_clean_working_tree(repo_path: Path, non_interactive: bool = False) -> None:
-    """Ensure working tree is clean before starting, prompting user if needed.
+def check_clean_working_tree(repo_path: Path) -> None:
+    """Check working tree status and warn if uncommitted changes exist.
 
     Args:
         repo_path: Path to git repository
-        non_interactive: If True, skip interactive prompt and raise error immediately.
-                         Use this for non-interactive environments like TUI.
     """
     if not has_uncommitted_changes(repo_path):
         return
 
-    # In non-interactive mode (TUI), just raise an error
-    if non_interactive:
-        raise RunnerError(
-            "Uncommitted changes detected. Please commit or stash changes before starting runner."
-        )
-
-    # Interactive mode (CLI) - prompt user
     print("\n⚠️  Warning: Uncommitted changes detected in the repository.")
-    print("   This will interfere with commit detection during the run.")
-    print("\nOptions:")
-    print("  1. Abort and let me commit/stash changes first (recommended)")
-    print("  2. Continue anyway (commit detection may be unreliable)")
-
-    while True:
-        choice = input("\nSelect option (1 or 2): ").strip()
-        if choice == "1":
-            raise RunnerError("Aborted. Please commit or stash your changes, then run again.")
-        if choice == "2":
-            print("\n⚠️  Continuing with uncommitted changes. Commit detection may be unreliable.")
-            return
-        print("Invalid choice. Please enter 1 or 2.")
+    print("   Commit detection may be unreliable during this run.")
 
 
 def check_mcp_server_exists(
     provider: Provider,
     project_path: Path,
     cfg: Config,
-    auto_install: bool = False,
-    non_interactive: bool = False,
 ) -> None:
     """Ensure spec-workflow MCP server is configured for the provider.
+
+    Auto-installs the MCP server if not found.
 
     Args:
         provider: Provider instance
         project_path: Path to project directory
         cfg: Configuration object with MCP settings
-        auto_install: If True, automatically install MCP server if not found
-        non_interactive: If True, don't prompt user for installation confirmation
     """
     mcp_cmd = provider.get_mcp_list_command()
     command = mcp_cmd.to_list()
@@ -332,21 +288,9 @@ def check_mcp_server_exists(
 
         output = result.stdout.lower()
         if server_name.lower() not in output:
-            # MCP server not found - attempt to install if enabled
-            if auto_install:
-                _install_mcp_server(provider, project_path, cfg, non_interactive)
-                return
-
-            executable = provider.get_mcp_list_command().executable
-            print(f"\n🔍 DEBUG: MCP list output (first 300 chars):")
-            print(f"   {repr(result.stdout[:300])}")
-            print(f"   Lowercase contains '{server_name}': {server_name.lower() in output}")
-            raise RunnerError(
-                f"{server_name} MCP server not found for {provider.get_provider_name()}.\n"
-                f"   The {server_name} MCP server is required for automatic task tracking.\n"
-                f"   Please configure it by running: {executable} mcp add {server_name} {cfg.mcp_package}\n"
-                f"   Or check your MCP server configuration."
-            )
+            # MCP server not found - auto-install
+            _install_mcp_server(provider, project_path, cfg)
+            return
 
         print(f"✓ {server_name} MCP server detected for {provider.get_provider_name()}")
 

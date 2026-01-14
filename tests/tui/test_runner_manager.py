@@ -145,7 +145,7 @@ class TestStartRunner:
 
         # Verify preconditions were checked
         mock_check_clean.assert_called_once_with(project_path)
-        mock_check_mcp.assert_called_once_with(mock_provider, project_path)
+        mock_check_mcp.assert_called_once_with(mock_provider, project_path, runner_manager.config)
         mock_get_commit.assert_called_once_with(project_path)
 
         # Verify runner state
@@ -162,25 +162,6 @@ class TestStartRunner:
 
         # Verify state persisted
         mock_persister.save.assert_called()
-
-    @patch("spec_workflow_runner.tui.runner_manager.check_clean_working_tree")
-    def test_start_runner_fails_dirty_tree(
-        self, mock_check_clean, runner_manager, mock_provider
-    ):
-        """Test start_runner fails when working tree is dirty."""
-        mock_check_clean.side_effect = Exception("Working tree is dirty")
-
-        project_path = Path("/test/project")
-        spec_name = "test-spec"
-        model = "sonnet"
-
-        with pytest.raises(Exception, match="Working tree is dirty"):
-            runner_manager.start_runner(
-                project_path=project_path,
-                spec_name=spec_name,
-                provider=mock_provider,
-                model=model,
-            )
 
     @patch("spec_workflow_runner.tui.runner_manager.check_clean_working_tree")
     @patch("spec_workflow_runner.tui.runner_manager.check_mcp_server_exists")

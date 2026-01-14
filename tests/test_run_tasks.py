@@ -206,11 +206,23 @@ def test_run_all_specs_processes_each_unfinished_spec(tmp_path: Path, monkeypatc
         seen.append(spec_name)
         _write_tasks(spec_path, "- [x] done\n")
 
-    monkeypatch.setattr(runner, "run_loop", fake_run_loop)
+    # Mock time.sleep to raise exception after first sleep (when entering polling mode)
+    sleep_count = {"count": 0}
 
-    runner.run_all_specs(provider, cfg, tmp_path, dry_run=False)
+    def fake_sleep(seconds: float) -> None:
+        sleep_count["count"] += 1
+        # Raise exception when entering polling mode to break infinite loop
+        raise KeyboardInterrupt("Test interrupt to exit polling")
+
+    monkeypatch.setattr(runner, "run_loop", fake_run_loop)
+    monkeypatch.setattr(runner.time, "sleep", fake_sleep)
+
+    # Should process both specs, then enter polling mode and raise KeyboardInterrupt
+    with pytest.raises(KeyboardInterrupt, match="Test interrupt"):
+        runner.run_all_specs(provider, cfg, tmp_path, dry_run=False)
 
     assert seen == ["alpha", "beta"]
+    assert sleep_count["count"] == 1  # Should sleep once when entering polling mode
 
 
 def test_ensure_provider_returns_explicit_value() -> None:
@@ -321,38 +333,21 @@ def test_check_clean_working_tree_passes_when_clean(tmp_path: Path) -> None:
     runner.check_clean_working_tree(tmp_path)
 
 
-def test_check_clean_working_tree_aborts_on_choice_1(tmp_path: Path, monkeypatch) -> None:
-    import subprocess
-
-    subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
-    (tmp_path / "uncommitted.txt").write_text("uncommitted", encoding="utf-8")
-
-    def fake_input(_prompt: str) -> str:
-        return "1"
-
-    monkeypatch.setattr("builtins.input", fake_input)
-
-    with pytest.raises(runner.RunnerError, match="Aborted"):
-        runner.check_clean_working_tree(tmp_path)
-
-
-def test_check_clean_working_tree_continues_on_choice_2(
-    tmp_path: Path, monkeypatch, capsys
+def test_check_clean_working_tree_warns_on_uncommitted_changes(
+    tmp_path: Path, capsys
 ) -> None:
+    """Verify that check_clean_working_tree warns but continues with uncommitted changes."""
     import subprocess
 
     subprocess.run(["git", "init"], cwd=tmp_path, check=True, capture_output=True)
     (tmp_path / "uncommitted.txt").write_text("uncommitted", encoding="utf-8")
 
-    def fake_input(_prompt: str) -> str:
-        return "2"
-
-    monkeypatch.setattr("builtins.input", fake_input)
-
+    # Should not raise, just warn
     runner.check_clean_working_tree(tmp_path)
 
     output = capsys.readouterr().out
-    assert "Continuing with uncommitted changes" in output
+    assert "Warning: Uncommitted changes detected" in output
+    assert "Commit detection may be unreliable" in output
 
 
 def test_run_provider_succeeds_on_first_attempt(tmp_path: Path, monkeypatch) -> None:
