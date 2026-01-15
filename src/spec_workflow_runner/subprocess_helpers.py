@@ -14,6 +14,34 @@ from pathlib import Path
 from typing import Any
 
 
+def format_command_string(command: list[str] | tuple[str, ...]) -> str:
+    """Format command as a properly quoted string for the current platform.
+
+    Uses platform-specific quoting rules:
+    - Windows: subprocess.list2cmdline() for cmd.exe/PowerShell compatibility
+    - Linux/macOS: shlex.join() for POSIX shell compatibility
+
+    Args:
+        command: Command as list or tuple
+
+    Returns:
+        Properly quoted command string suitable for display or shell execution
+
+    Examples:
+        >>> format_command_string(['echo', 'hello world'])
+        # Windows: 'echo "hello world"'
+        # Linux: "echo 'hello world'"
+    """
+    is_windows = platform.system() == "Windows"
+
+    if is_windows:
+        # Use Windows-native quoting (handles cmd.exe and PowerShell)
+        return subprocess.list2cmdline(command)
+    else:
+        # Use POSIX shell quoting (bash, zsh, sh)
+        return shlex.join(command)
+
+
 def _get_clean_env(additions: dict[str, str] | None = None) -> dict[str, str]:
     """Get environment with CLAUDE_* variables removed and optional additions.
 

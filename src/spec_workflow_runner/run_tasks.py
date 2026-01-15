@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-import shlex
 import subprocess
 import sys
 import textwrap
@@ -15,7 +14,7 @@ from pathlib import Path
 from typing import TextIO
 
 from .providers import ClaudeProvider, Provider, create_provider, get_supported_models
-from .subprocess_helpers import popen_command
+from .subprocess_helpers import format_command_string, popen_command
 from .utils import (
     Config,
     RunnerError,
@@ -387,7 +386,7 @@ def build_prompt(cfg: Config, spec_name: str, stats: TaskStats) -> str:
 def _build_log_header(iteration: int, spec_name: str, command: list[str], prompt: str) -> str:
     """Build the log file header with metadata."""
     started = datetime.now(UTC).isoformat()
-    formatted_command = " ".join(shlex.quote(part) for part in command)
+    formatted_command = format_command_string(command)
     return textwrap.dedent(
         f"""\
         # Iteration {iteration}
@@ -417,7 +416,7 @@ def _write_dry_run_log(log_path: Path, header: str, command: str) -> None:
 
 def _execute_provider_command(command: list[str], project_path: Path, header: str, log_path: Path) -> None:
     """Execute provider command and stream output to log."""
-    formatted_command = " ".join(shlex.quote(part) for part in command)
+    formatted_command = format_command_string(command)
     print("\nRunning:", formatted_command)
 
     output_lines: list[str] = []
@@ -463,7 +462,7 @@ def run_provider(
     provider_cmd = provider.build_command(prompt, project_path, cfg.codex_config_overrides)
     command = provider_cmd.to_list()
     header = _build_log_header(iteration, spec_name, command, prompt)
-    formatted_command = " ".join(shlex.quote(part) for part in command)
+    formatted_command = format_command_string(command)
 
     if dry_run:
         _write_dry_run_log(log_path, header, formatted_command)
