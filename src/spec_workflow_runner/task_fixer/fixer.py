@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import platform
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
@@ -147,9 +148,12 @@ class TaskFixer:
                 command.to_list(),
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 timeout=self._subprocess_timeout,
                 cwd=project_path,
                 env=env,
+                shell=(platform.system() == "Windows"),
             )
 
             if result.returncode != 0:

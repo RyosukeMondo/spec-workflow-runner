@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import platform
 import re
 import subprocess
 import time
@@ -177,6 +178,8 @@ def get_current_commit(repo_path: Path) -> str:
         cwd=repo_path,
         capture_output=True,
         text=True,
+        encoding='utf-8',
+        errors='replace',
         check=True,
     )
     return result.stdout.strip()
@@ -189,6 +192,8 @@ def has_uncommitted_changes(repo_path: Path) -> bool:
         cwd=repo_path,
         capture_output=True,
         text=True,
+        encoding='utf-8',
+        errors='replace',
         check=True,
     )
     return bool(result.stdout.strip())
@@ -222,7 +227,10 @@ def _install_mcp_server(provider: Provider, project_path: Path, cfg: Config) -> 
             cwd=project_path,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             check=False,
+            shell=(platform.system() == "Windows"),
         )
 
         if result.returncode != 0:
@@ -276,7 +284,10 @@ def check_mcp_server_exists(
             cwd=project_path,
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             check=False,
+            shell=(platform.system() == "Windows"),
         )
 
         if result.returncode != 0:
@@ -313,7 +324,10 @@ def get_active_claude_account() -> str | None:
             ["claude-account"],
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             check=False,
+            shell=(platform.system() == "Windows"),
         )
         if result.returncode == 0:
             return result.stdout.strip()
@@ -339,7 +353,10 @@ def rotate_claude_account() -> bool:
             ["claude-rotate"],
             capture_output=True,
             text=True,
+            encoding='utf-8',
+            errors='replace',
             check=False,
+            shell=(platform.system() == "Windows"),
         )
 
         if result.returncode == 0:

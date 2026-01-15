@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+import platform
 import signal
 import subprocess
 import time
@@ -193,13 +194,18 @@ class RunnerManager:
             if key.startswith("CLAUDE") or key.startswith("CLAUDE_"):
                 del env[key]
 
+        # On Windows with shell=True, use string command; otherwise use list
+        is_windows = platform.system() == "Windows"
+        popen_command = " ".join(cmd_list) if is_windows else cmd_list
+
         process = subprocess.Popen(
-            cmd_list,
+            popen_command,
             cwd=project_path,
             stdout=log_file,
             stderr=subprocess.STDOUT,
             text=True,
             env=env,
+            shell=is_windows,
         )
 
         # Create runner state
@@ -435,6 +441,8 @@ class RunnerManager:
                 cwd=runner.project_path,
                 capture_output=True,
                 text=True,
+                encoding='utf-8',
+                errors='replace',
                 check=True,
             )
 

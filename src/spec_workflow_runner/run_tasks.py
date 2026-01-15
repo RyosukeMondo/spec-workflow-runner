@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import platform
 import shlex
 import subprocess
 import sys
@@ -426,16 +427,21 @@ def _execute_provider_command(command: list[str], project_path: Path, header: st
         if key.startswith("CLAUDE") or key.startswith("CLAUDE_"):
             del env[key]
 
+    # On Windows with shell=True, use string command; otherwise use list
+    is_windows = platform.system() == "Windows"
+    popen_command = formatted_command if is_windows else command
+
     output_lines: list[str] = []
     with log_path.open("w", encoding="utf-8") as handle:
         handle.write(header)
         proc = subprocess.Popen(
-            command,
+            popen_command,
             cwd=project_path,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             bufsize=0,
             env=env,
+            shell=is_windows,
         )
         assert proc.stdout is not None
         for line in iter(proc.stdout.readline, b""):
