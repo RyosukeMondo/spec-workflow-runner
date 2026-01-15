@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-import os
-import platform
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 
 from ..providers import Provider
+from ..subprocess_helpers import run_command
 from .diff_generator import DiffGenerator, DiffResult
 from .file_writer import FileWriter, WriteResult
 from .prompt_builder import PromptBuilder, PromptContext
@@ -138,22 +137,11 @@ class TaskFixer:
                 config_overrides=(),
             )
 
-            # Clear Claude-specific env vars to avoid nested Claude Code session conflicts
-            env = os.environ.copy()
-            for key in list(env.keys()):
-                if key.startswith("CLAUDE") or key.startswith("CLAUDE_"):
-                    del env[key]
-
-            result = subprocess.run(
+            result = run_command(
                 command.to_list(),
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
-                timeout=self._subprocess_timeout,
                 cwd=project_path,
-                env=env,
-                shell=(platform.system() == "Windows"),
+                timeout=self._subprocess_timeout,
+                clean_claude_env=True,
             )
 
             if result.returncode != 0:

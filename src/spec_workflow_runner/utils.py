@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import platform
 import re
 import subprocess
 import time
@@ -12,6 +11,8 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
+
+from .subprocess_helpers import run_command
 
 if TYPE_CHECKING:
     from .providers import Provider
@@ -173,13 +174,9 @@ def reduce_spec_context(project_path: Path, spec_name: str, cfg: Config) -> bool
 
 def get_current_commit(repo_path: Path) -> str:
     """Return the current HEAD commit id for the repo."""
-    result = subprocess.run(
+    result = run_command(
         ["git", "rev-parse", "HEAD"],
         cwd=repo_path,
-        capture_output=True,
-        text=True,
-        encoding='utf-8',
-        errors='replace',
         check=True,
     )
     return result.stdout.strip()
@@ -187,13 +184,9 @@ def get_current_commit(repo_path: Path) -> str:
 
 def has_uncommitted_changes(repo_path: Path) -> bool:
     """Check if there are uncommitted changes (staged or unstaged)."""
-    result = subprocess.run(
+    result = run_command(
         ["git", "status", "--porcelain"],
         cwd=repo_path,
-        capture_output=True,
-        text=True,
-        encoding='utf-8',
-        errors='replace',
         check=True,
     )
     return bool(result.stdout.strip())
@@ -222,15 +215,10 @@ def _install_mcp_server(provider: Provider, project_path: Path, cfg: Config) -> 
     print(f"\n📦 Auto-installing spec-workflow MCP server for {provider.get_provider_name()}...")
 
     try:
-        result = subprocess.run(
+        result = run_command(
             command,
             cwd=project_path,
-            capture_output=True,
-            text=True,
-            encoding='utf-8',
-            errors='replace',
             check=False,
-            shell=(platform.system() == "Windows"),
         )
 
         if result.returncode != 0:
@@ -279,15 +267,10 @@ def check_mcp_server_exists(
     server_name = cfg.mcp_server_name
 
     try:
-        result = subprocess.run(
+        result = run_command(
             command,
             cwd=project_path,
-            capture_output=True,
-            text=True,
-            encoding='utf-8',
-            errors='replace',
             check=False,
-            shell=(platform.system() == "Windows"),
         )
 
         if result.returncode != 0:
@@ -320,14 +303,9 @@ def get_active_claude_account() -> str | None:
         The name of the active account, or None if not found.
     """
     try:
-        result = subprocess.run(
+        result = run_command(
             ["claude-account"],
-            capture_output=True,
-            text=True,
-            encoding='utf-8',
-            errors='replace',
             check=False,
-            shell=(platform.system() == "Windows"),
         )
         if result.returncode == 0:
             return result.stdout.strip()
@@ -349,14 +327,9 @@ def rotate_claude_account() -> bool:
     logger = logging.getLogger(__name__)
 
     try:
-        result = subprocess.run(
+        result = run_command(
             ["claude-rotate"],
-            capture_output=True,
-            text=True,
-            encoding='utf-8',
-            errors='replace',
             check=False,
-            shell=(platform.system() == "Windows"),
         )
 
         if result.returncode == 0:

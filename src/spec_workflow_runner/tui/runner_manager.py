@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import logging
 import os
-import platform
 import signal
 import subprocess
 import time
@@ -18,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from ..subprocess_helpers import popen_command, run_command
 from ..utils import (
     check_clean_working_tree,
     check_mcp_server_exists,
@@ -188,24 +188,12 @@ class RunnerManager:
         # Open log file and keep it open for the duration of the process
         log_file = log_path.open("w", encoding="utf-8", buffering=1)  # Line buffered
 
-        # Clear Claude-specific env vars to avoid nested Claude Code session conflicts
-        env = os.environ.copy()
-        for key in list(env.keys()):
-            if key.startswith("CLAUDE") or key.startswith("CLAUDE_"):
-                del env[key]
-
-        # On Windows with shell=True, use string command; otherwise use list
-        is_windows = platform.system() == "Windows"
-        popen_command = " ".join(cmd_list) if is_windows else cmd_list
-
-        process = subprocess.Popen(
-            popen_command,
+        process = popen_command(
+            cmd_list,
             cwd=project_path,
             stdout=log_file,
-            stderr=subprocess.STDOUT,
-            text=True,
-            env=env,
-            shell=is_windows,
+            clean_claude_env=True,
+            text_mode=True,
         )
 
         # Create runner state
@@ -436,13 +424,9 @@ class RunnerManager:
                 return None, None
 
             # Get commit message for the latest commit
-            result = subprocess.run(
+            result = run_command(
                 ["git", "log", "-1", "--format=%H %s"],
                 cwd=runner.project_path,
-                capture_output=True,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
                 check=True,
             )
 

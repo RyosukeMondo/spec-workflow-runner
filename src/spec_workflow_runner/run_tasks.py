@@ -5,7 +5,6 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-import platform
 import shlex
 import subprocess
 import sys
@@ -16,6 +15,7 @@ from pathlib import Path
 from typing import TextIO
 
 from .providers import ClaudeProvider, Provider, create_provider, get_supported_models
+from .subprocess_helpers import popen_command
 from .utils import (
     Config,
     RunnerError,
@@ -420,28 +420,15 @@ def _execute_provider_command(command: list[str], project_path: Path, header: st
     formatted_command = " ".join(shlex.quote(part) for part in command)
     print("\nRunning:", formatted_command)
 
-    env = os.environ.copy()
-    env["PYTHONUNBUFFERED"] = "1"
-    # Clear Claude-specific env vars to avoid nested Claude Code session conflicts
-    for key in list(env.keys()):
-        if key.startswith("CLAUDE") or key.startswith("CLAUDE_"):
-            del env[key]
-
-    # On Windows with shell=True, use string command; otherwise use list
-    is_windows = platform.system() == "Windows"
-    popen_command = formatted_command if is_windows else command
-
     output_lines: list[str] = []
     with log_path.open("w", encoding="utf-8") as handle:
         handle.write(header)
-        proc = subprocess.Popen(
-            popen_command,
+        proc = popen_command(
+            command,
             cwd=project_path,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            bufsize=0,
-            env=env,
-            shell=is_windows,
+            clean_claude_env=True,
+            env_additions={"PYTHONUNBUFFERED": "1"},
         )
         assert proc.stdout is not None
         for line in iter(proc.stdout.readline, b""):
