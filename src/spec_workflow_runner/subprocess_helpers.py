@@ -105,7 +105,7 @@ def run_command(
 
     # On Windows with shell=True, subprocess requires a string command
     if is_windows:
-        command_str = " ".join(shlex.quote(arg) for arg in command)
+        command_str = format_command_string(command)
         return subprocess.run(
             command_str,
             cwd=cwd,
@@ -177,7 +177,7 @@ def popen_command(
 
     # On Windows with shell=True, subprocess requires a string command
     if is_windows:
-        command_str = " ".join(shlex.quote(arg) for arg in command)
+        command_str = format_command_string(command)
         return subprocess.Popen(
             command_str,
             cwd=cwd,

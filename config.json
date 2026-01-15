@@ -4,7 +4,7 @@
   "specs_subdir": "specs",
   "tasks_filename": "tasks.md",
   "codex_command": ["codex", "e", "--dangerously-bypass-approvals-and-sandbox"],
-  "prompt_template": "IMPORTANT: You have the spec-workflow MCP server available. Use the manage-tasks tool IMMEDIATELY to list all tasks for spec '{spec_name}', find the first pending task, and work on it. Before starting work, mark the task as in-progress. When you complete the work, you MUST run 'git add' followed by 'git commit' with a clear message, then mark the task as completed using manage-tasks. DO NOT just stage files - you must actually commit them. DO NOT ask permission - just start working immediately. Make atomic commits for each semantic group of changes.",
+  "prompt_template": "Work on the single next task for spec {spec_name}. When you complete a logical unit of work, you MUST run 'git add' followed by 'git commit' with a clear message. DO NOT just stage files - you must actually commit them. DO NOT ask permission - just commit immediately when work is done. Make atomic commits for each semantic group of changes.",
   "no_commit_limit": 3,
   "log_dir_name": "logs",
   "log_file_template": "task_{index}.log",
