@@ -441,14 +441,31 @@ def _execute_provider_command(
     output_lines: list[str] = []
 
     def read_output(proc: subprocess.Popen, handle: TextIO, output_lines: list[str]) -> None:
-        """Read process output in background thread."""
+        """Read process output in background thread.
+
+        Detects "No messages returned" error and kills the process early
+        to avoid waiting for timeout.
+        """
         assert proc.stdout is not None
+        no_messages_detected = False
+
         for line in iter(proc.stdout.readline, b""):
             decoded = line.decode("utf-8", errors="replace")
             print(decoded, end="")
             handle.write(decoded)
             handle.flush()
             output_lines.append(decoded)
+
+            # Detect "No messages returned" error early
+            if "no messages returned" in decoded.lower() and not no_messages_detected:
+                no_messages_detected = True
+                print("\n[DEBUG] Detected 'No messages returned' in output - will terminate process early")
+                # Give it a moment to finish output, then kill
+                import time
+                time.sleep(2)
+                if proc.poll() is None:  # Still running
+                    print("[DEBUG] Process still running after error - terminating")
+                    proc.kill()
 
     with log_path.open("w", encoding="utf-8") as handle:
         handle.write(header)
@@ -487,9 +504,20 @@ def _execute_provider_command(
         reader_thread.join()
         handle.write(f"\n# Exit Code\n{returncode}\n")
 
+    # Check if "No messages returned" was detected in output
+    output_text = "".join(output_lines)
+    has_no_messages_error = "no messages returned" in output_text.lower()
+
     if returncode != 0:
+        # If process was killed due to "No messages returned", treat as potentially successful
+        if has_no_messages_error and returncode == -9:  # -9 = SIGKILL
+            print(f"⚠️  Process terminated due to 'No messages returned' error")
+            print(f"   Treating as potentially successful. Circuit breaker will stop if no progress.")
+            handle.write(f"\n# Note\nProcess killed early due to 'No messages returned' error\n")
+            print(f"Saved log: {log_path}")
+            return  # Don't raise error - let circuit breaker handle it
+
         # Include output in error message for better error detection
-        output_text = "".join(output_lines)
         raise RunnerError(f"Provider command failed. Output: {output_text}")
     print(f"Saved log: {log_path}")
 
@@ -547,6 +575,11 @@ def run_provider(
             is_context_error = is_context_limit_error(error_message)
             is_timeout = is_timeout_error(error_message)
             is_no_messages = is_no_messages_error(error_message)
+
+            # DEBUG: Print error type detection results
+            print(f"[DEBUG] Error detected - is_no_messages: {is_no_messages}, is_timeout: {is_timeout}, is_rate: {is_rate_error}, is_context: {is_context_error}")
+            if is_no_messages:
+                print(f"[DEBUG] Error message preview: {error_message[:200]}...")
 
             # Handle "No messages returned" error - treat as potentially successful
             if is_no_messages:
