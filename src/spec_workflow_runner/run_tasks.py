@@ -29,6 +29,7 @@ from .utils import (
     get_current_commit,
     has_uncommitted_changes,
     is_context_limit_error,
+    is_no_messages_error,
     is_rate_limit_error,
     is_timeout_error,
     list_unfinished_specs,
@@ -545,6 +546,28 @@ def run_provider(
             is_rate_error = is_rate_limit_error(error_message)
             is_context_error = is_context_limit_error(error_message)
             is_timeout = is_timeout_error(error_message)
+            is_no_messages = is_no_messages_error(error_message)
+
+            # Handle "No messages returned" error - treat as potentially successful
+            if is_no_messages:
+                logger.warning(
+                    "Claude CLI returned 'No messages returned' error - treating as potentially successful",
+                    extra={
+                        "extra_context": {
+                            "attempt": attempt,
+                            "spec_name": spec_name,
+                            "iteration": iteration,
+                            "error": error_message,
+                        }
+                    },
+                )
+                print(
+                    "⚠️  Claude CLI error: 'No messages returned'. "
+                    "This may indicate completion or a transient issue."
+                )
+                print("   Continuing to next iteration. Circuit breaker will stop if no progress.")
+                # Return successfully - let circuit breaker handle repeated no-commit scenarios
+                return
 
             # Handle timeout errors
             if is_timeout:

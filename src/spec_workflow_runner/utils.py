@@ -111,6 +111,23 @@ def is_timeout_error(error_message: str) -> bool:
     return "timed out after" in error_lower or "timeout exceeded" in error_lower
 
 
+def is_no_messages_error(error_message: str) -> bool:
+    """Detect if an error is the Claude CLI 'No messages returned' error.
+
+    This error often occurs when Claude completes successfully but doesn't output
+    anything, or when there's a transient CLI issue. It should be treated as
+    potentially successful (check for commits) rather than a hard failure.
+
+    Args:
+        error_message: The error message string to check
+
+    Returns:
+        True if the error is a 'No messages returned' error, False otherwise
+    """
+    error_lower = error_message.lower()
+    return "no messages returned" in error_lower
+
+
 def reduce_spec_context(project_path: Path, spec_name: str, cfg: Config) -> bool:
     """Reduce context size by archiving implementation logs and updating .claudeignore.
 
