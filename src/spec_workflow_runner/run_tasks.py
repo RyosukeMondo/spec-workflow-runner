@@ -30,6 +30,7 @@ from .utils import (
     has_uncommitted_changes,
     is_context_limit_error,
     is_rate_limit_error,
+    is_timeout_error,
     list_unfinished_specs,
     load_config,
     read_task_stats,
@@ -414,12 +415,40 @@ def _write_dry_run_log(log_path: Path, header: str, command: str) -> None:
     print(f"Saved log: {log_path}")
 
 
-def _execute_provider_command(command: list[str], project_path: Path, header: str, log_path: Path) -> None:
-    """Execute provider command and stream output to log."""
+def _execute_provider_command(
+    command: list[str], project_path: Path, header: str, log_path: Path, timeout_seconds: int | None = None
+) -> None:
+    """Execute provider command and stream output to log with optional timeout.
+
+    Args:
+        command: Command to execute
+        project_path: Working directory for command
+        header: Log file header
+        log_path: Path to write log file
+        timeout_seconds: Maximum execution time in seconds, None for no timeout
+
+    Raises:
+        RunnerError: If command fails or times out
+    """
+    import threading
+
     formatted_command = format_command_string(command)
     print("\nRunning:", formatted_command)
+    if timeout_seconds:
+        print(f"Timeout: {timeout_seconds}s ({timeout_seconds // 60} minutes)")
 
     output_lines: list[str] = []
+
+    def read_output(proc: subprocess.Popen, handle: TextIO, output_lines: list[str]) -> None:
+        """Read process output in background thread."""
+        assert proc.stdout is not None
+        for line in iter(proc.stdout.readline, b""):
+            decoded = line.decode("utf-8", errors="replace")
+            print(decoded, end="")
+            handle.write(decoded)
+            handle.flush()
+            output_lines.append(decoded)
+
     with log_path.open("w", encoding="utf-8") as handle:
         handle.write(header)
         proc = popen_command(
@@ -429,17 +458,35 @@ def _execute_provider_command(command: list[str], project_path: Path, header: st
             clean_claude_env=True,
             env_additions={"PYTHONUNBUFFERED": "1"},
         )
-        assert proc.stdout is not None
-        for line in iter(proc.stdout.readline, b""):
-            decoded = line.decode("utf-8", errors="replace")
-            print(decoded, end="")
-            handle.write(decoded)
-            handle.flush()
-            output_lines.append(decoded)
-        proc.wait()
-        handle.write(f"\n# Exit Code\n{proc.returncode}\n")
 
-    if proc.returncode != 0:
+        # Start output reading thread
+        reader_thread = threading.Thread(
+            target=read_output,
+            args=(proc, handle, output_lines),
+            daemon=True
+        )
+        reader_thread.start()
+
+        # Wait for process with timeout
+        try:
+            returncode = proc.wait(timeout=timeout_seconds)
+        except subprocess.TimeoutExpired:
+            # Timeout occurred - kill the process
+            print(f"\n⚠️  Timeout exceeded ({timeout_seconds}s). Terminating process...")
+            proc.kill()
+            reader_thread.join(timeout=5)  # Wait briefly for output thread
+            handle.write(f"\n# Timeout\nProcess terminated after {timeout_seconds} seconds\n")
+            handle.write(f"\n# Exit Code\nTIMEOUT\n")
+            raise RunnerError(
+                f"Provider command timed out after {timeout_seconds} seconds "
+                f"({timeout_seconds // 60} minutes). The AI may be stuck or the task is too complex."
+            )
+
+        # Wait for output thread to finish
+        reader_thread.join()
+        handle.write(f"\n# Exit Code\n{returncode}\n")
+
+    if returncode != 0:
         # Include output in error message for better error detection
         output_text = "".join(output_lines)
         raise RunnerError(f"Provider command failed. Output: {output_text}")
@@ -475,7 +522,9 @@ def run_provider(
 
     while True:
         try:
-            _execute_provider_command(command, project_path, header, log_path)
+            _execute_provider_command(
+                command, project_path, header, log_path, timeout_seconds=cfg.iteration_timeout_seconds
+            )
             if attempt > 1:
                 logger.info(
                     "Provider command succeeded on retry",
@@ -495,6 +544,96 @@ def run_provider(
             error_message = str(err)
             is_rate_error = is_rate_limit_error(error_message)
             is_context_error = is_context_limit_error(error_message)
+            is_timeout = is_timeout_error(error_message)
+
+            # Handle timeout errors
+            if is_timeout:
+                logger.warning(
+                    "Iteration timeout exceeded, attempting recovery",
+                    extra={
+                        "extra_context": {
+                            "attempt": attempt,
+                            "timeout_seconds": cfg.iteration_timeout_seconds,
+                            "spec_name": spec_name,
+                            "iteration": iteration,
+                            "error": error_message,
+                        }
+                    },
+                )
+
+                # Try to reduce context by archiving implementation logs
+                print("⚠️  Iteration timeout. Attempting to reduce context...")
+                context_reduced = reduce_spec_context(project_path, spec_name, cfg)
+
+                if context_reduced:
+                    logger.info(
+                        "Context reduced after timeout, retrying immediately",
+                        extra={
+                            "extra_context": {
+                                "attempt": attempt,
+                                "spec_name": spec_name,
+                                "iteration": iteration,
+                            }
+                        },
+                    )
+                    print("✓ Context reduced by archiving implementation logs. Retrying...")
+                    # Retry immediately after reducing context, but increment attempt
+                    attempt += 1
+                    if attempt > cfg.max_retries:
+                        logger.error(
+                            "Timeout persists after context reduction and retries",
+                            extra={
+                                "extra_context": {
+                                    "attempts": attempt,
+                                    "spec_name": spec_name,
+                                    "iteration": iteration,
+                                    "timeout_seconds": cfg.iteration_timeout_seconds,
+                                }
+                            },
+                        )
+                        raise RunnerError(
+                            f"Iteration timed out repeatedly after {attempt - 1} retries "
+                            f"({cfg.iteration_timeout_seconds}s = {cfg.iteration_timeout_seconds // 60} min). "
+                            f"The task may be too complex or the AI is stuck. "
+                            f"Consider breaking down the task or increasing iteration_timeout_seconds."
+                        )
+                    continue
+
+                # No logs to archive - fail after one retry attempt
+                if attempt < 2:
+                    wait_seconds = 30
+                    logger.info(
+                        f"No context to reduce, waiting {wait_seconds}s before retry",
+                        extra={
+                            "extra_context": {
+                                "attempt": attempt,
+                                "spec_name": spec_name,
+                                "iteration": iteration,
+                            }
+                        },
+                    )
+                    print(f"⚠️  No logs to archive. Waiting {wait_seconds}s before retry...")
+                    time.sleep(wait_seconds)
+                    attempt += 1
+                    continue
+                else:
+                    logger.error(
+                        "Timeout persists without ability to reduce context",
+                        extra={
+                            "extra_context": {
+                                "attempts": attempt,
+                                "spec_name": spec_name,
+                                "iteration": iteration,
+                                "timeout_seconds": cfg.iteration_timeout_seconds,
+                            }
+                        },
+                    )
+                    raise RunnerError(
+                        f"Iteration timed out after {attempt} attempts "
+                        f"({cfg.iteration_timeout_seconds}s = {cfg.iteration_timeout_seconds // 60} min). "
+                        f"The task may be too complex or the AI is stuck. "
+                        f"Consider breaking down the task or increasing iteration_timeout_seconds."
+                    )
 
             # Handle rate limit errors
             if is_rate_error:

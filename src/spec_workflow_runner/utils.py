@@ -98,6 +98,19 @@ def is_context_limit_error(error_message: str) -> bool:
     return False
 
 
+def is_timeout_error(error_message: str) -> bool:
+    """Detect if an error is due to iteration timeout.
+
+    Args:
+        error_message: The error message string to check
+
+    Returns:
+        True if the error is a timeout error, False otherwise
+    """
+    error_lower = error_message.lower()
+    return "timed out after" in error_lower or "timeout exceeded" in error_lower
+
+
 def reduce_spec_context(project_path: Path, spec_name: str, cfg: Config) -> bool:
     """Reduce context size by archiving implementation logs and updating .claudeignore.
 
@@ -387,6 +400,7 @@ class Config:
     tui_min_terminal_rows: int = 24
     max_retries: int = 3
     context_limit_wait_seconds: int = 600
+    iteration_timeout_seconds: int = 1800
     mcp_server_name: str = "spec-workflow"
     mcp_package: str = "npx @pimzino/spec-workflow-mcp@latest"
 
@@ -412,6 +426,7 @@ class Config:
         tui_min_terminal_rows = int(payload.get("tui_min_terminal_rows", 24))
         max_retries = int(payload.get("max_retries", 3))
         context_limit_wait_seconds = int(payload.get("context_limit_wait_seconds", 600))
+        iteration_timeout_seconds = int(payload.get("iteration_timeout_seconds", 1800))
 
         if tui_refresh_seconds <= 0:
             raise ValueError(f"tui_refresh_seconds must be positive, got {tui_refresh_seconds}")
@@ -430,6 +445,10 @@ class Config:
         if context_limit_wait_seconds <= 0:
             raise ValueError(
                 f"context_limit_wait_seconds must be positive, got {context_limit_wait_seconds}"
+            )
+        if iteration_timeout_seconds <= 0:
+            raise ValueError(
+                f"iteration_timeout_seconds must be positive, got {iteration_timeout_seconds}"
             )
 
         # MCP config: env vars take precedence over config.json, with defaults
@@ -463,6 +482,7 @@ class Config:
             tui_min_terminal_rows=tui_min_terminal_rows,
             max_retries=max_retries,
             context_limit_wait_seconds=context_limit_wait_seconds,
+            iteration_timeout_seconds=iteration_timeout_seconds,
             mcp_server_name=mcp_server_name,
             mcp_package=mcp_package,
         )

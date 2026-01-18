@@ -238,6 +238,26 @@ To adjust cache settings in `config.json`:
 
 ### Configuration
 
+#### Iteration Timeout
+
+The runner enforces a per-iteration timeout to prevent AI from getting stuck indefinitely:
+
+```json
+{
+  "iteration_timeout_seconds": 1800
+}
+```
+
+- **Default**: 1800 seconds (30 minutes)
+- **Behavior**: If an iteration exceeds this timeout, the process is killed and the runner:
+  1. Attempts to reduce context by archiving implementation logs
+  2. Retries up to `max_retries` times (default: 3)
+  3. Fails with a clear error if timeout persists
+
+Adjust this value based on your task complexity. Increase for complex tasks that legitimately need more time.
+
+#### MCP Server Timeouts
+
 If Codex MCP servers take longer than the default 10 seconds to boot or respond,
 set `codex_config_overrides` inside `config.json`. Each key maps to a Codex
 configuration dotted path:
