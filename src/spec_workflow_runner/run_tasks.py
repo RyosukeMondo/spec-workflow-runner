@@ -439,6 +439,7 @@ def _execute_provider_command(
         print(f"Timeout: {timeout_seconds}s ({timeout_seconds // 60} minutes)")
 
     output_lines: list[str] = []
+    early_termination_flag = {"triggered": False}  # Use dict for mutability across threads
 
     def read_output(proc: subprocess.Popen, handle: TextIO, output_lines: list[str]) -> None:
         """Read process output in background thread.
@@ -459,6 +460,7 @@ def _execute_provider_command(
             # Detect "No messages returned" error early
             if "no messages returned" in decoded.lower() and not no_messages_detected:
                 no_messages_detected = True
+                early_termination_flag["triggered"] = True
                 print("\n[DEBUG] Detected 'No messages returned' in output - will terminate process early")
                 # Give it a moment to finish output, then kill
                 import time
@@ -502,6 +504,11 @@ def _execute_provider_command(
 
         # Wait for output thread to finish
         reader_thread.join()
+
+        # Write note about early termination if it occurred (before closing file)
+        if early_termination_flag["triggered"]:
+            handle.write(f"\n# Note\nProcess killed early due to 'No messages returned' error\n")
+
         handle.write(f"\n# Exit Code\n{returncode}\n")
 
     # Check if "No messages returned" was detected in output
@@ -513,7 +520,6 @@ def _execute_provider_command(
         if has_no_messages_error and returncode == -9:  # -9 = SIGKILL
             print(f"⚠️  Process terminated due to 'No messages returned' error")
             print(f"   Treating as potentially successful. Circuit breaker will stop if no progress.")
-            handle.write(f"\n# Note\nProcess killed early due to 'No messages returned' error\n")
             print(f"Saved log: {log_path}")
             return  # Don't raise error - let circuit breaker handle it
 
