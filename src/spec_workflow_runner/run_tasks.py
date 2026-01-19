@@ -467,7 +467,14 @@ def _execute_provider_command(
                 time.sleep(2)
                 if proc.poll() is None:  # Still running
                     print("[DEBUG] Process still running after error - terminating")
-                    proc.kill()
+                    try:
+                        proc.terminate()  # Try graceful termination first
+                        time.sleep(1)
+                        if proc.poll() is None:  # Still alive
+                            proc.kill()  # Force kill if terminate didn't work
+                    except Exception as e:
+                        print(f"[DEBUG] Error terminating process: {e}")
+                break  # Exit the loop immediately after killing
 
     with log_path.open("w", encoding="utf-8") as handle:
         handle.write(header)
@@ -502,8 +509,10 @@ def _execute_provider_command(
                 f"({timeout_seconds // 60} minutes). The AI may be stuck or the task is too complex."
             )
 
-        # Wait for output thread to finish
-        reader_thread.join()
+        # Wait for output thread to finish (with timeout to avoid hanging)
+        reader_thread.join(timeout=10)
+        if reader_thread.is_alive():
+            print("[WARNING] Reader thread did not finish in time - process may have hung")
 
         # Write note about early termination if it occurred (before closing file)
         if early_termination_flag["triggered"]:
