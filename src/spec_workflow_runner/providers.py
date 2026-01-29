@@ -131,6 +131,12 @@ class ClaudeProvider(Provider):
             args.extend(["--model", self._model])
         if self._skip_permissions:
             args.append("--dangerously-skip-permissions")
+
+        # Load MCP servers from project settings if available
+        settings_path = project_path / ".claude" / "settings.json"
+        if settings_path.exists():
+            args.extend(["--mcp-config", str(settings_path)])
+
         args.append(prompt)
         return ProviderCommand(executable=self._executable, args=tuple(args))
 
