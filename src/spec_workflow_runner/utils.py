@@ -417,7 +417,8 @@ class Config:
     tui_min_terminal_rows: int = 24
     max_retries: int = 3
     context_limit_wait_seconds: int = 600
-    iteration_timeout_seconds: int = 1800
+    activity_timeout_seconds: int = 300
+    activity_check_interval_seconds: int = 300
     mcp_server_name: str = "spec-workflow"
     mcp_package: str = "npx @pimzino/spec-workflow-mcp@latest"
 
@@ -443,7 +444,8 @@ class Config:
         tui_min_terminal_rows = int(payload.get("tui_min_terminal_rows", 24))
         max_retries = int(payload.get("max_retries", 3))
         context_limit_wait_seconds = int(payload.get("context_limit_wait_seconds", 600))
-        iteration_timeout_seconds = int(payload.get("iteration_timeout_seconds", 1800))
+        activity_timeout_seconds = int(payload.get("activity_timeout_seconds", 300))
+        activity_check_interval_seconds = int(payload.get("activity_check_interval_seconds", 300))
 
         if tui_refresh_seconds <= 0:
             raise ValueError(f"tui_refresh_seconds must be positive, got {tui_refresh_seconds}")
@@ -463,9 +465,13 @@ class Config:
             raise ValueError(
                 f"context_limit_wait_seconds must be positive, got {context_limit_wait_seconds}"
             )
-        if iteration_timeout_seconds <= 0:
+        if activity_timeout_seconds <= 0:
             raise ValueError(
-                f"iteration_timeout_seconds must be positive, got {iteration_timeout_seconds}"
+                f"activity_timeout_seconds must be positive, got {activity_timeout_seconds}"
+            )
+        if activity_check_interval_seconds <= 0:
+            raise ValueError(
+                f"activity_check_interval_seconds must be positive, got {activity_check_interval_seconds}"
             )
 
         # MCP config: env vars take precedence over config.json, with defaults
@@ -499,7 +505,8 @@ class Config:
             tui_min_terminal_rows=tui_min_terminal_rows,
             max_retries=max_retries,
             context_limit_wait_seconds=context_limit_wait_seconds,
-            iteration_timeout_seconds=iteration_timeout_seconds,
+            activity_timeout_seconds=activity_timeout_seconds,
+            activity_check_interval_seconds=activity_check_interval_seconds,
             mcp_server_name=mcp_server_name,
             mcp_package=mcp_package,
         )

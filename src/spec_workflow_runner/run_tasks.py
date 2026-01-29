@@ -416,27 +416,68 @@ def _write_dry_run_log(log_path: Path, header: str, command: str) -> None:
     print(f"Saved log: {log_path}")
 
 
+def _get_latest_file_mtime(project_path: Path, ignore_dirs: tuple[str, ...]) -> float:
+    """Get the most recent file modification time in project directory.
+
+    Args:
+        project_path: Project directory to scan
+        ignore_dirs: Directory names to skip
+
+    Returns:
+        Most recent modification timestamp, or 0.0 if no files found
+    """
+    latest_mtime = 0.0
+    try:
+        for root, dirs, files in os.walk(project_path):
+            # Filter out ignored directories
+            dirs[:] = [d for d in dirs if d not in ignore_dirs]
+
+            for file in files:
+                try:
+                    file_path = Path(root) / file
+                    mtime = file_path.stat().st_mtime
+                    if mtime > latest_mtime:
+                        latest_mtime = mtime
+                except (OSError, PermissionError):
+                    # Skip files we can't access
+                    continue
+    except Exception:
+        # If scan fails, return 0 to avoid breaking timeout logic
+        pass
+
+    return latest_mtime
+
+
 def _execute_provider_command(
-    command: list[str], project_path: Path, header: str, log_path: Path, timeout_seconds: int | None = None
+    command: list[str],
+    project_path: Path,
+    header: str,
+    log_path: Path,
+    activity_timeout_seconds: int | None = None,
+    activity_check_interval_seconds: int = 300,
+    ignore_dirs: tuple[str, ...] = ()
 ) -> None:
-    """Execute provider command and stream output to log with optional timeout.
+    """Execute provider command and stream output to log with activity-based timeout.
 
     Args:
         command: Command to execute
         project_path: Working directory for command
         header: Log file header
         log_path: Path to write log file
-        timeout_seconds: Maximum execution time in seconds, None for no timeout
+        activity_timeout_seconds: Max seconds of inactivity before timeout, None for no timeout
+        activity_check_interval_seconds: How often to check for activity (default: 300s)
+        ignore_dirs: Directories to ignore when checking file activity
 
     Raises:
-        RunnerError: If command fails or times out
+        RunnerError: If command fails or times out due to inactivity
     """
     import threading
 
     formatted_command = format_command_string(command)
     print("\nRunning:", formatted_command)
-    if timeout_seconds:
-        print(f"Timeout: {timeout_seconds}s ({timeout_seconds // 60} minutes)")
+    if activity_timeout_seconds:
+        print(f"Activity timeout: {activity_timeout_seconds}s ({activity_timeout_seconds // 60} minutes of inactivity)")
+        print(f"Checking activity every: {activity_check_interval_seconds}s ({activity_check_interval_seconds // 60} minutes)")
 
     output_lines: list[str] = []
     early_termination_flag = {"triggered": False}  # Use dict for mutability across threads
@@ -494,20 +535,47 @@ def _execute_provider_command(
         )
         reader_thread.start()
 
-        # Wait for process with timeout
-        try:
-            returncode = proc.wait(timeout=timeout_seconds)
-        except subprocess.TimeoutExpired:
-            # Timeout occurred - kill the process
-            print(f"\n⚠️  Timeout exceeded ({timeout_seconds}s). Terminating process...")
-            proc.kill()
-            reader_thread.join(timeout=5)  # Wait briefly for output thread
-            handle.write(f"\n# Timeout\nProcess terminated after {timeout_seconds} seconds\n")
-            handle.write(f"\n# Exit Code\nTIMEOUT\n")
-            raise RunnerError(
-                f"Provider command timed out after {timeout_seconds} seconds "
-                f"({timeout_seconds // 60} minutes). The AI may be stuck or the task is too complex."
-            )
+        # Wait for process with activity-based timeout monitoring
+        returncode = None
+        last_mtime = _get_latest_file_mtime(project_path, ignore_dirs)
+        check_interval = activity_check_interval_seconds if activity_timeout_seconds else None
+
+        while returncode is None:
+            try:
+                # Check process status with short timeout
+                returncode = proc.wait(timeout=check_interval if check_interval else None)
+            except subprocess.TimeoutExpired:
+                # Check hasn't finished yet - check for activity
+                if activity_timeout_seconds:
+                    current_mtime = _get_latest_file_mtime(project_path, ignore_dirs)
+                    current_time = time.time()
+
+                    if current_mtime > last_mtime:
+                        # Activity detected - update baseline
+                        last_mtime = current_mtime
+                        inactivity_seconds = 0
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] Activity detected, continuing...")
+                    else:
+                        # No activity - check if we've exceeded threshold
+                        inactivity_seconds = int(current_time - last_mtime)
+
+                        if inactivity_seconds > activity_timeout_seconds:
+                            # Inactivity timeout - kill the process
+                            print(f"\n⚠️  No file activity for {inactivity_seconds}s (>{activity_timeout_seconds}s). Terminating process...")
+                            proc.kill()
+                            reader_thread.join(timeout=5)  # Wait briefly for output thread
+                            handle.write(f"\n# Inactivity Timeout\nProcess terminated after {inactivity_seconds} seconds of inactivity\n")
+                            handle.write(f"\n# Exit Code\nINACTIVITY_TIMEOUT\n")
+                            raise RunnerError(
+                                f"Provider command timed out due to {inactivity_seconds} seconds of inactivity "
+                                f"(threshold: {activity_timeout_seconds}s = {activity_timeout_seconds // 60} minutes). "
+                                f"The AI may be stuck or waiting for input."
+                            )
+                        else:
+                            # Still within threshold
+                            print(f"[{datetime.now().strftime('%H:%M:%S')}] No activity for {inactivity_seconds}s (max: {activity_timeout_seconds}s)")
+                # If no activity timeout configured, just continue
+                continue
 
         # Wait for output thread to finish (with timeout to avoid hanging)
         reader_thread.join(timeout=10)
@@ -567,7 +635,13 @@ def run_provider(
     while True:
         try:
             _execute_provider_command(
-                command, project_path, header, log_path, timeout_seconds=cfg.iteration_timeout_seconds
+                command,
+                project_path,
+                header,
+                log_path,
+                activity_timeout_seconds=cfg.activity_timeout_seconds,
+                activity_check_interval_seconds=cfg.activity_check_interval_seconds,
+                ignore_dirs=cfg.ignore_dirs
             )
             if attempt > 1:
                 logger.info(
@@ -620,11 +694,11 @@ def run_provider(
             # Handle timeout errors
             if is_timeout:
                 logger.warning(
-                    "Iteration timeout exceeded, attempting recovery",
+                    "Activity timeout exceeded, attempting recovery",
                     extra={
                         "extra_context": {
                             "attempt": attempt,
-                            "timeout_seconds": cfg.iteration_timeout_seconds,
+                            "timeout_seconds": cfg.activity_timeout_seconds,
                             "spec_name": spec_name,
                             "iteration": iteration,
                             "error": error_message,
@@ -633,7 +707,7 @@ def run_provider(
                 )
 
                 # Try to reduce context by archiving implementation logs
-                print("⚠️  Iteration timeout. Attempting to reduce context...")
+                print("⚠️  Activity timeout (no file changes detected). Attempting to reduce context...")
                 context_reduced = reduce_spec_context(project_path, spec_name, cfg)
 
                 if context_reduced:
@@ -658,15 +732,15 @@ def run_provider(
                                     "attempts": attempt,
                                     "spec_name": spec_name,
                                     "iteration": iteration,
-                                    "timeout_seconds": cfg.iteration_timeout_seconds,
+                                    "timeout_seconds": cfg.activity_timeout_seconds,
                                 }
                             },
                         )
                         raise RunnerError(
-                            f"Iteration timed out repeatedly after {attempt - 1} retries "
-                            f"({cfg.iteration_timeout_seconds}s = {cfg.iteration_timeout_seconds // 60} min). "
+                            f"Activity timeout occurred repeatedly after {attempt - 1} retries "
+                            f"({cfg.activity_timeout_seconds}s = {cfg.activity_timeout_seconds // 60} min). "
                             f"The task may be too complex or the AI is stuck. "
-                            f"Consider breaking down the task or increasing iteration_timeout_seconds."
+                            f"Consider breaking down the task or increasing activity_timeout_seconds."
                         )
                     continue
 
@@ -695,15 +769,15 @@ def run_provider(
                                 "attempts": attempt,
                                 "spec_name": spec_name,
                                 "iteration": iteration,
-                                "timeout_seconds": cfg.iteration_timeout_seconds,
+                                "timeout_seconds": cfg.activity_timeout_seconds,
                             }
                         },
                     )
                     raise RunnerError(
-                        f"Iteration timed out after {attempt} attempts "
-                        f"({cfg.iteration_timeout_seconds}s = {cfg.iteration_timeout_seconds // 60} min). "
+                        f"Activity timeout occurred after {attempt} attempts "
+                        f"({cfg.activity_timeout_seconds}s = {cfg.activity_timeout_seconds // 60} min). "
                         f"The task may be too complex or the AI is stuck. "
-                        f"Consider breaking down the task or increasing iteration_timeout_seconds."
+                        f"Consider breaking down the task or increasing activity_timeout_seconds."
                     )
 
             # Handle rate limit errors
