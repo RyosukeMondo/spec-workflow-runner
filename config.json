@@ -4,7 +4,7 @@
   "specs_subdir": "specs",
   "tasks_filename": "tasks.md",
   "codex_command": ["codex", "e", "--dangerously-bypass-approvals-and-sandbox"],
-  "prompt_template": "⚠️ IMPORTANT: NO launch swarms on this session - Do not invoke agents or use multiple threading to prevent hang-ups from thread management failures.\n\nWork on the next pending task(s) for spec {spec_name}. You may work on multiple tasks at once if they are similar, related, or beneficial to complete together. When you complete a logical unit of work, you MUST run 'git add' followed by 'git commit' with a clear message. DO NOT just stage files - you must actually commit them. DO NOT ask permission - just commit immediately when work is done. Make atomic commits for each semantic group of changes.",
+  "prompt_template": "⚠️ IMPORTANT: NO launch swarms on this session - Do not invoke agents or use multiple threading to prevent hang-ups from thread management failures.\n\nYou have access to the spec-workflow MCP server. Use the 'spec_workflow_list_tasks' tool to get the task list for spec '{spec_name}', then work on the next pending task(s). You may work on multiple tasks at once if they are similar, related, or beneficial to complete together.\n\nWhen you complete a logical unit of work, you MUST run 'git add' followed by 'git commit' with a clear message. DO NOT just stage files - you must actually commit them. DO NOT ask permission - just commit immediately when work is done. Make atomic commits for each semantic group of changes.\n\nStart by calling spec_workflow_list_tasks with spec_name='{spec_name}' to see what tasks need to be done.",
   "no_commit_limit": 3,
   "log_dir_name": "logs",
   "log_file_template": "task_{index}.log",

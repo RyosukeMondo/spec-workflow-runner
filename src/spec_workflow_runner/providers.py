@@ -126,11 +126,12 @@ class ClaudeProvider(Provider):
         config_overrides: Sequence[tuple[str, str]],
     ) -> ProviderCommand:
         """Build claude command with permissions skipped for automation and model selection."""
-        args = ["-p", prompt]
+        args = ["--print"]
         if self._model:
             args.extend(["--model", self._model])
         if self._skip_permissions:
             args.append("--dangerously-skip-permissions")
+        args.append(prompt)
         return ProviderCommand(executable=self._executable, args=tuple(args))
 
     def get_mcp_list_command(self) -> ProviderCommand:
