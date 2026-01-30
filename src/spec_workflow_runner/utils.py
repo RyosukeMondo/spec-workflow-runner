@@ -705,22 +705,11 @@ def read_task_stats(tasks_path: Path) -> TaskStats:
 
     pending = done = in_progress = 0
 
-    # Count checkbox format tasks
-    checkbox_matches = list(TASK_PATTERN.finditer(task_text))
-    for match in checkbox_matches:
-        state = match.group("state").lower()
-        if state == "x":
-            done += 1
-        elif state == "-":
-            in_progress += 1
-        else:
-            pending += 1
+    # Try heading format first (### TASK-ID: with **Status**: field)
+    heading_matches = list(HEADING_TASK_PATTERN.finditer(task_text))
 
-    # If no checkbox tasks found, try alternate heading format
-    if not checkbox_matches:
-        # Find all ### TASK-ID: headings
-        heading_matches = list(HEADING_TASK_PATTERN.finditer(task_text))
-
+    if heading_matches:
+        # This is a heading-format file
         for i, heading_match in enumerate(heading_matches):
             # Extract the section for this task (from heading to next heading or end)
             start_pos = heading_match.start()
@@ -743,6 +732,16 @@ def read_task_stats(tasks_path: Path) -> TaskStats:
                     pending += 1
             else:
                 # No status field, assume pending
+                pending += 1
+    else:
+        # Fall back to checkbox format (- [ ] tasks)
+        for match in TASK_PATTERN.finditer(task_text):
+            state = match.group("state").lower()
+            if state == "x":
+                done += 1
+            elif state == "-":
+                in_progress += 1
+            else:
                 pending += 1
 
     return TaskStats(done=done, pending=pending, in_progress=in_progress)
