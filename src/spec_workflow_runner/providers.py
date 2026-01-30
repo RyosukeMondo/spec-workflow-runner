@@ -136,8 +136,15 @@ class ClaudeProvider(Provider):
         args.extend(["--output-format", "stream-json", "--verbose"])
 
         # Load MCP servers from project settings if available
+        # Use minimal config to avoid hooks that block in --print mode
+        minimal_config_path = project_path / ".claude" / "mcp-only.json"
         settings_path = project_path / ".claude" / "settings.json"
-        if settings_path.exists():
+
+        if minimal_config_path.exists():
+            args.extend(["--mcp-config", str(minimal_config_path)])
+        elif settings_path.exists():
+            # Fallback to full settings if minimal doesn't exist
+            # WARNING: May be slow if settings has SessionStart hooks
             args.extend(["--mcp-config", str(settings_path)])
 
         args.append(prompt)
