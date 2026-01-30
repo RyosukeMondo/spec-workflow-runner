@@ -687,7 +687,13 @@ def _execute_provider_command(
                         if isinstance(content, list):
                             for item in content:
                                 if item.get("type") == "text":
-                                    print(item.get("text", ""), flush=True)
+                                    text = item.get("text", "")
+                                    # Handle Unicode encoding errors on Windows
+                                    try:
+                                        print(text, flush=True)
+                                    except UnicodeEncodeError:
+                                        # Replace problematic characters with ASCII equivalents
+                                        print(text.encode('ascii', errors='replace').decode('ascii'), flush=True)
                                 elif item.get("type") == "tool_use":
                                     tool_name = item.get("name", "unknown")
                                     tool_use_id = item.get("id")
@@ -697,7 +703,10 @@ def _execute_provider_command(
                                         pending_tool_uses[tool_use_id] = tool_name
                                 elif item.get("type") == "thinking":
                                     thinking = item.get("thinking", "")[:150]
-                                    print(f"[Thinking: {thinking}...]", flush=True)
+                                    try:
+                                        print(f"[Thinking: {thinking}...]", flush=True)
+                                    except UnicodeEncodeError:
+                                        print(f"[Thinking: {thinking.encode('ascii', errors='replace').decode('ascii')}...]", flush=True)
 
                 elif msg_type == "result":
                     # Show final result
