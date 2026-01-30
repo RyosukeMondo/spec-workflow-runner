@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import logging
 import os
 import subprocess
@@ -496,13 +497,34 @@ def _execute_provider_command(
 
         line_count = 0
         for line in iter(proc.stdout.readline, b""):
-            decoded = line.decode("utf-8", errors="replace")
+            decoded = line.decode("utf-8", errors="replace").strip()
             if line_count == 0:
                 print("[DEBUG] First output line received from Claude", flush=True)
-            print(decoded, end="", flush=True)  # Force flush to console
-            handle.write(decoded)
+
+            # Write raw JSONL to log file
+            handle.write(decoded + "\n")
             handle.flush()
             output_lines.append(decoded)
+
+            # Parse and display stream-json format
+            try:
+                data = json.loads(decoded)
+                if "message" in data and "content" in data["message"]:
+                    content = data["message"]["content"]
+                    if isinstance(content, list):
+                        for item in content:
+                            if item.get("type") == "text":
+                                print(item.get("text", ""), flush=True)
+                            elif item.get("type") == "tool_use":
+                                tool_name = item.get("name", "unknown")
+                                print(f"[Using tool: {tool_name}]", flush=True)
+                            elif item.get("type") == "thinking":
+                                thinking = item.get("thinking", "")[:150]
+                                print(f"[Thinking: {thinking}...]", flush=True)
+            except (json.JSONDecodeError, KeyError, TypeError):
+                # If not valid JSON, just print the line
+                print(decoded, flush=True)
+
             line_count += 1
 
             # Detect "No messages returned" error early

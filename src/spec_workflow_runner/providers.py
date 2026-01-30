@@ -132,6 +132,9 @@ class ClaudeProvider(Provider):
         if self._skip_permissions:
             args.append("--dangerously-skip-permissions")
 
+        # Use stream-json for real-time output visibility
+        args.extend(["--output-format", "stream-json"])
+
         # Load MCP servers from project settings if available
         settings_path = project_path / ".claude" / "settings.json"
         if settings_path.exists():
