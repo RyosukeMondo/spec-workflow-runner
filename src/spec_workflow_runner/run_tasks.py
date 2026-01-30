@@ -110,6 +110,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Force refresh of project cache, ignoring existing cache.",
     )
+    parser.add_argument(
+        "--debug",
+        action="store_true",
+        help="Enable debug output (verbose logging).",
+    )
     return parser.parse_args()
 
 
@@ -618,7 +623,6 @@ def _execute_provider_command(
     import tempfile
     cmd_file = Path(tempfile.gettempdir()) / "last_command.txt"
     cmd_file.write_text(formatted_command, encoding="utf-8")
-    print(f"\n[DEBUG] Command saved to: {cmd_file}")
 
     print("\nRunning:", formatted_command)
     if activity_timeout_seconds:
@@ -638,25 +642,17 @@ def _execute_provider_command(
         no_messages_detected = False
 
         import sys
-        print("[DEBUG] Output reader thread started, waiting for Claude output...", flush=True)
-        print(f"[DEBUG] proc.stdout: {proc.stdout}", flush=True)
-        print(f"[DEBUG] About to start reading loop...", flush=True)
 
         line_count = 0
         while True:
             import sys
-            print(f"[DEBUG] About to call readline() - line {line_count + 1}", file=sys.stderr, flush=True)
             sys.stderr.flush()
             line = proc.stdout.readline()
-            print(f"[DEBUG] readline() returned, length: {len(line) if line else 0}", file=sys.stderr, flush=True)
             sys.stderr.flush()
             if not line:  # Empty bytes means EOF
-                print("[DEBUG] Got empty line, breaking", file=sys.stderr, flush=True)
                 break
-            print(f"[DEBUG] Got line {line_count + 1}, length: {len(line)}", flush=True)
             decoded = line.decode("utf-8", errors="replace").strip()
             if line_count == 0:
-                print("[DEBUG] First output line received from Claude", flush=True)
 
             # Write raw JSONL to log file
             handle.write(decoded + "\n")
@@ -709,22 +705,18 @@ def _execute_provider_command(
             if "no messages returned" in decoded.lower() and not no_messages_detected:
                 no_messages_detected = True
                 early_termination_flag["triggered"] = True
-                print("\n[DEBUG] Detected 'No messages returned' in output - will terminate process early")
                 # Give it a moment to finish output, then kill
                 import time
                 time.sleep(2)
                 if proc.poll() is None:  # Still running
-                    print("[DEBUG] Process still running after error - terminating")
                     try:
                         proc.terminate()  # Try graceful termination first
                         time.sleep(1)
                         if proc.poll() is None:  # Still alive
                             proc.kill()  # Force kill if terminate didn't work
                     except Exception as e:
-                        print(f"[DEBUG] Error terminating process: {e}")
                 break  # Exit the loop immediately after killing
 
-        print(f"\n[DEBUG] Output reader thread finished. Received {line_count} lines from Claude", flush=True)
 
     with log_path.open("w", encoding="utf-8") as handle:
         handle.write(header)
@@ -738,8 +730,6 @@ def _execute_provider_command(
             env_additions={"PYTHONUNBUFFERED": "1"},
         )
 
-        print(f"[DEBUG] Claude process started with PID: {proc.pid}", flush=True)
-        print(f"[DEBUG] Process poll status: {proc.poll()}", flush=True)
 
         # Start output reading thread
         reader_thread = threading.Thread(
@@ -748,7 +738,6 @@ def _execute_provider_command(
             daemon=True
         )
         reader_thread.start()
-        print("[DEBUG] Reader thread started", flush=True)
 
         # Note: Session monitoring only works for interactive mode, not --print mode
         # In --print mode, we can only monitor file system changes
@@ -897,9 +886,7 @@ def run_provider(
             is_no_messages = is_no_messages_error(error_message)
 
             # DEBUG: Print error type detection results
-            print(f"[DEBUG] Error detected - is_no_messages: {is_no_messages}, is_timeout: {is_timeout}, is_rate: {is_rate_error}, is_context: {is_context_error}")
             if is_no_messages:
-                print(f"[DEBUG] Error message preview: {error_message[:200]}...")
 
             # Handle "No messages returned" error - treat as potentially successful
             if is_no_messages:
