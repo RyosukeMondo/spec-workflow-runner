@@ -494,9 +494,12 @@ def _execute_provider_command(
 
         import sys
         print("[DEBUG] Output reader thread started, waiting for Claude output...", flush=True)
+        print(f"[DEBUG] proc.stdout: {proc.stdout}", flush=True)
+        print(f"[DEBUG] About to start iterator loop...", flush=True)
 
         line_count = 0
         for line in iter(proc.stdout.readline, b""):
+            print(f"[DEBUG] Got line {line_count + 1}, length: {len(line)}", flush=True)
             decoded = line.decode("utf-8", errors="replace").strip()
             if line_count == 0:
                 print("[DEBUG] First output line received from Claude", flush=True)
