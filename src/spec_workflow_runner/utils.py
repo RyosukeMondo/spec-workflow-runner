@@ -953,6 +953,70 @@ def get_all_spec_progress(project: Path, cfg: Config) -> list[SpecProgress]:
     return progress_list
 
 
+def monitor_claude_flow_workers(project_path: Path) -> dict[str, dict]:
+    """Monitor claude-flow worker status if available.
+
+    Returns dict of worker name -> worker stats, or empty dict if claude-flow not active.
+    """
+    daemon_state_file = project_path / ".claude-flow" / "daemon-state.json"
+    if not daemon_state_file.exists():
+        return {}
+
+    try:
+        with open(daemon_state_file, encoding="utf-8") as f:
+            data = json.load(f)
+            return data.get("workers", {})
+    except (json.JSONDecodeError, KeyError, OSError):
+        return {}
+
+
+def has_claude_flow_activity(project_path: Path, since_seconds: float = 60) -> bool:
+    """Check if claude-flow workers have been active recently."""
+    workers = monitor_claude_flow_workers(project_path)
+    if not workers:
+        return False
+
+    current_time = time.time()
+    for worker_stats in workers.values():
+        if worker_stats.get("isRunning"):
+            return True
+
+        last_run = worker_stats.get("lastRun")
+        if last_run:
+            try:
+                from datetime import datetime
+                last_run_time = datetime.fromisoformat(last_run.replace('Z', '+00:00'))
+                time_diff = current_time - last_run_time.timestamp()
+                if time_diff < since_seconds:
+                    return True
+            except (ValueError, AttributeError):
+                continue
+
+    return False
+
+
+def display_claude_flow_status(project_path: Path) -> None:
+    """Display claude-flow worker status if available."""
+    workers = monitor_claude_flow_workers(project_path)
+    if not workers:
+        return
+
+    print("\n" + "-" * 80)
+    print("CLAUDE-FLOW WORKERS:")
+    print("-" * 80)
+
+    for name, stats in workers.items():
+        status = "[RUNNING]" if stats.get("isRunning") else "[IDLE]"
+        success_rate = 0.0
+        if stats.get("runCount", 0) > 0:
+            success_rate = (stats.get("successCount", 0) / stats["runCount"]) * 100
+
+        print(f"{status:12} {name:15} | "
+              f"Runs: {stats.get('runCount', 0):4} | "
+              f"Success: {success_rate:5.1f}% | "
+              f"Avg: {stats.get('averageDurationMs', 0):8.1f}ms")
+
+
 def display_overall_progress(project: Path, cfg: Config) -> None:
     """Display overall progress across all specs."""
     progress_list = get_all_spec_progress(project, cfg)

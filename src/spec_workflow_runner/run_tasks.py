@@ -25,11 +25,13 @@ from .utils import (
     choose_option,
     discover_projects,
     discover_specs,
+    display_claude_flow_status,
     display_overall_progress,
     display_spec_queue,
     get_active_claude_account,
     get_all_spec_progress,
     get_current_commit,
+    has_claude_flow_activity,
     has_uncommitted_changes,
     is_context_limit_error,
     is_no_messages_error,
@@ -37,6 +39,7 @@ from .utils import (
     is_timeout_error,
     list_unfinished_specs,
     load_config,
+    monitor_claude_flow_workers,
     read_task_details,
     read_task_stats,
     reduce_spec_context,
@@ -317,6 +320,9 @@ def run_all_specs(
     while True:
         # Display overall progress summary
         display_overall_progress(project, cfg)
+
+        # Display claude-flow worker status if available
+        display_claude_flow_status(project)
 
         unfinished = list_unfinished_specs(project, cfg)
         if not unfinished:
@@ -1535,20 +1541,22 @@ def run_loop(
             project_path, last_commit, no_commit_streak, cfg
         )
 
-        # Check if progress was made
+        # Check if progress was made (multiple signals)
         has_new_commit = new_last_commit != last_commit
         has_agent_commits = agent_commits > 0
+        has_worker_activity = has_claude_flow_activity(project_path, since_seconds=300)
 
-        if has_new_commit or has_agent_commits:
+        if has_new_commit or has_agent_commits or has_worker_activity:
             # Progress made - reset circuit breaker
             if has_agent_commits:
                 print(f"[OK] Progress made (agents: {agent_commits} commit(s))")
+            elif has_worker_activity:
+                print(f"[OK] Progress made (claude-flow workers active)")
             else:
                 print(f"[OK] Progress made (new commit)")
             no_commit_streak = 0
         else:
-            # No commits, but Claude might have just updated tasks.md
-            # Check if tasks.md was modified
+            # No commits, no worker activity
             print(f"[!]  No commits detected this iteration")
             print(f"     Circuit breaker streak: {no_commit_streak}/{cfg.no_commit_limit}")
 
