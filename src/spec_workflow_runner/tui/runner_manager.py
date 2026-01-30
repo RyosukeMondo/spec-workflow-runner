@@ -17,6 +17,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
+from ..completion_checker import CompletionResult, smart_completion_check
 from ..subprocess_helpers import popen_command, run_command
 from ..utils import (
     check_clean_working_tree,
@@ -446,6 +447,62 @@ class RunnerManager:
         except subprocess.CalledProcessError as err:
             logger.error(f"Failed to detect commits for runner {runner_id}: {err}")
             return None, None
+
+    def check_completion_smart(
+        self,
+        runner_id: str,
+        max_probes: int | None = None,
+        probe_interval: int | None = None,
+    ) -> CompletionResult:
+        """Smart completion check: git commits + probing + rescue.
+
+        This method uses multiple signals to robustly detect completion:
+        1. Primary: Check for new git commits
+        2. Fallback: Probe session with --continue when no commits
+        3. Rescue: Salvage uncommitted work before declaring incomplete
+
+        Args:
+            runner_id: ID of runner to check
+            max_probes: Maximum probe attempts (default: from config)
+            probe_interval: Seconds between probes (default: from config)
+
+        Returns:
+            CompletionResult with status
+
+        Raises:
+            KeyError: If runner_id is not found
+        """
+        runner = self.runners.get(runner_id)
+        if not runner:
+            raise KeyError(f"Runner {runner_id} not found")
+
+        # Use config defaults if not specified
+        if max_probes is None:
+            max_probes = self.config.completion_check_max_probes
+        if probe_interval is None:
+            probe_interval = self.config.completion_check_probe_interval
+
+        logger.info(
+            f"Starting smart completion check for runner {runner_id} "
+            f"(spec={runner.spec_name}, max_probes={max_probes}, "
+            f"probe_interval={probe_interval}s)"
+        )
+
+        result = smart_completion_check(
+            project_path=runner.project_path,
+            spec_name=runner.spec_name,
+            baseline_commit=runner.baseline_commit,
+            max_probes=max_probes,
+            probe_interval=probe_interval,
+        )
+
+        logger.info(
+            f"Smart completion check result: complete={result.complete}, "
+            f"status={result.status}, new_commits={result.new_commits}, "
+            f"probes={result.probes_used}, rescued={result.rescued}"
+        )
+
+        return result
 
     def maybe_retry_runner(
         self,

@@ -425,6 +425,9 @@ class Config:
     mcp_server_name: str = "spec-workflow"
     mcp_package: str = "npx @pimzino/spec-workflow-mcp@latest"
     retry_config: RetryConfig = RetryConfig()
+    enable_smart_completion_check: bool = True
+    completion_check_max_probes: int = 5
+    completion_check_probe_interval: int = 30
 
     @classmethod
     def from_dict(cls, payload: dict) -> Config:
@@ -499,6 +502,20 @@ class Config:
             max_backoff_seconds=int(payload.get("retry_max_backoff_seconds", 300)),
         )
 
+        # Load smart completion check configuration
+        enable_smart_completion_check = bool(payload.get("enable_smart_completion_check", True))
+        completion_check_max_probes = int(payload.get("completion_check_max_probes", 5))
+        completion_check_probe_interval = int(payload.get("completion_check_probe_interval", 30))
+
+        if completion_check_max_probes <= 0:
+            raise ValueError(
+                f"completion_check_max_probes must be positive, got {completion_check_max_probes}"
+            )
+        if completion_check_probe_interval <= 0:
+            raise ValueError(
+                f"completion_check_probe_interval must be positive, got {completion_check_probe_interval}"
+            )
+
         return cls(
             repos_root=repos_root,
             spec_workflow_dir_name=payload["spec_workflow_dir_name"],
@@ -527,6 +544,9 @@ class Config:
             mcp_server_name=mcp_server_name,
             mcp_package=mcp_package,
             retry_config=retry_config,
+            enable_smart_completion_check=enable_smart_completion_check,
+            completion_check_max_probes=completion_check_max_probes,
+            completion_check_probe_interval=completion_check_probe_interval,
         )
 
 

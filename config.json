@@ -27,5 +27,8 @@
   "retry_on_crash": true,
   "retry_log_dir": "logs/retries",
   "retry_backoff_multiplier": 2.0,
-  "retry_max_backoff_seconds": 300
+  "retry_max_backoff_seconds": 300,
+  "enable_smart_completion_check": true,
+  "completion_check_max_probes": 5,
+  "completion_check_probe_interval": 30
 }
