@@ -14,7 +14,6 @@ from pathlib import Path
 from typing import TextIO
 
 from .providers import ClaudeProvider, Provider, create_provider, get_supported_models
-from .session_monitor import SessionMonitor
 from .subprocess_helpers import format_command_string, popen_command
 from .utils import (
     Config,
@@ -536,18 +535,11 @@ def _execute_provider_command(
         )
         reader_thread.start()
 
-        # Start session monitor for real-time activity tracking
-        session_monitor = SessionMonitor(project_path)
-        print(f"📊 Starting session monitor (waiting for Claude to create session file)...")
-
-        session_started = session_monitor.start(wait_seconds=10)
-
-        if session_started:
-            print(f"✓ Session monitoring active - showing real-time Claude activity")
-        else:
-            sessions_dir = session_monitor.sessions_dir
-            print(f"⚠️  Session file not found at: {sessions_dir}")
-            print(f"   Falling back to file-based activity detection")
+        # Note: Session monitoring only works for interactive mode, not --print mode
+        # In --print mode, we can only monitor file system changes
+        print(f"📊 Monitoring file system activity (--print mode has no session logs)...")
+        session_started = False
+        session_monitor = None
 
         # Wait for process with activity-based timeout monitoring
         returncode = None
@@ -564,42 +556,25 @@ def _execute_provider_command(
                     # Check process status with short timeout for responsive display
                     returncode = proc.wait(timeout=display_interval)
                 except subprocess.TimeoutExpired:
-                    # Process hasn't finished yet - check for session updates (always)
-                    session_has_activity = False
-                    if session_started:
-                        has_activity, updates = session_monitor.check_activity()
-                        if has_activity:
-                            session_has_activity = True
-                            # Display session updates in real-time
-                            for update in updates:
-                                print(update)
-
-                    # Check file modifications
+                    # Process hasn't finished yet - check for file modifications
+                    current_time = time.time()
                     current_mtime = _get_latest_file_mtime(project_path, ignore_dirs)
                     file_has_activity = current_mtime > last_mtime
 
                     if file_has_activity:
                         last_mtime = current_mtime
-                        if not session_has_activity:
-                            # Only show file activity if no session updates
-                            print(f"[{datetime.now().strftime('%H:%M:%S')}] 📝 File activity detected")
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] 📝 File modified - Claude is working")
 
-                    # Only check for timeout at configured interval
-                    current_time = time.time()
+                    # Check for timeout at configured interval
                     if activity_timeout_seconds and (current_time - last_timeout_check) >= activity_check_interval_seconds:
                         last_timeout_check = current_time
-
-                        # Calculate inactivity duration
-                        if session_started:
-                            inactivity_seconds = int(session_monitor.get_seconds_since_activity())
-                        else:
-                            inactivity_seconds = int(current_time - last_mtime)
+                        inactivity_seconds = int(current_time - last_mtime)
 
                         if inactivity_seconds > activity_timeout_seconds:
                             # Inactivity timeout - kill the process
-                            print(f"\n⚠️  No activity for {inactivity_seconds}s (>{activity_timeout_seconds}s). Terminating process...")
+                            print(f"\n⚠️  No file changes for {inactivity_seconds}s (>{activity_timeout_seconds}s). Terminating process...")
                             proc.kill()
-                            reader_thread.join(timeout=5)  # Wait briefly for output thread
+                            reader_thread.join(timeout=5)
                             handle.write(f"\n# Inactivity Timeout\nProcess terminated after {inactivity_seconds} seconds of inactivity\n")
                             handle.write(f"\n# Exit Code\nINACTIVITY_TIMEOUT\n")
                             raise RunnerError(
@@ -607,15 +582,14 @@ def _execute_provider_command(
                                 f"(threshold: {activity_timeout_seconds}s = {activity_timeout_seconds // 60} minutes). "
                                 f"The AI may be stuck or waiting for input."
                             )
-                        elif inactivity_seconds > 60:
-                            # Show status update if inactive for more than 1 minute
-                            print(f"[{datetime.now().strftime('%H:%M:%S')}] ⏳ No activity for {inactivity_seconds}s (max: {activity_timeout_seconds}s)")
+                        else:
+                            # Show periodic status
+                            mins = inactivity_seconds // 60
+                            secs = inactivity_seconds % 60
+                            print(f"[{datetime.now().strftime('%H:%M:%S')}] ⏳ Running... (no file changes for {mins}m {secs}s, max: {activity_timeout_seconds // 60}m)")
 
                     # Continue loop
                     continue
-        finally:
-            # Clean up session monitor
-            session_monitor.close()
 
         # Wait for output thread to finish (with timeout to avoid hanging)
         reader_thread.join(timeout=10)
