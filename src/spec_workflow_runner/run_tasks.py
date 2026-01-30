@@ -552,60 +552,66 @@ def _execute_provider_command(
         # Wait for process with activity-based timeout monitoring
         returncode = None
         last_mtime = _get_latest_file_mtime(project_path, ignore_dirs)
-        check_interval = activity_check_interval_seconds if activity_timeout_seconds else None
+
+        # Use short intervals for checking/displaying updates (5 seconds)
+        # But only do timeout checks at activity_check_interval_seconds
+        display_interval = 5  # Check for updates every 5 seconds
+        last_timeout_check = time.time()
 
         try:
             while returncode is None:
                 try:
-                    # Check process status with short timeout
-                    returncode = proc.wait(timeout=check_interval if check_interval else None)
+                    # Check process status with short timeout for responsive display
+                    returncode = proc.wait(timeout=display_interval)
                 except subprocess.TimeoutExpired:
-                    # Process hasn't finished yet - check for activity
-                    if activity_timeout_seconds:
-                        # Check session activity first (more accurate)
-                        session_has_activity = False
+                    # Process hasn't finished yet - check for session updates (always)
+                    session_has_activity = False
+                    if session_started:
+                        has_activity, updates = session_monitor.check_activity()
+                        if has_activity:
+                            session_has_activity = True
+                            # Display session updates in real-time
+                            for update in updates:
+                                print(update)
+
+                    # Check file modifications
+                    current_mtime = _get_latest_file_mtime(project_path, ignore_dirs)
+                    file_has_activity = current_mtime > last_mtime
+
+                    if file_has_activity:
+                        last_mtime = current_mtime
+                        if not session_has_activity:
+                            # Only show file activity if no session updates
+                            print(f"[{datetime.now().strftime('%H:%M:%S')}] 📝 File activity detected")
+
+                    # Only check for timeout at configured interval
+                    current_time = time.time()
+                    if activity_timeout_seconds and (current_time - last_timeout_check) >= activity_check_interval_seconds:
+                        last_timeout_check = current_time
+
+                        # Calculate inactivity duration
                         if session_started:
-                            has_activity, updates = session_monitor.check_activity()
-                            if has_activity:
-                                session_has_activity = True
-                                # Display session updates
-                                for update in updates:
-                                    print(update)
-
-                        # Fall back to file modifications if no session monitoring
-                        current_mtime = _get_latest_file_mtime(project_path, ignore_dirs)
-                        file_has_activity = current_mtime > last_mtime
-
-                        if session_has_activity or file_has_activity:
-                            # Activity detected
-                            if file_has_activity:
-                                last_mtime = current_mtime
-                            if not session_has_activity:
-                                # Only show file activity if no session updates
-                                print(f"[{datetime.now().strftime('%H:%M:%S')}] 📝 File activity detected, continuing...")
+                            inactivity_seconds = int(session_monitor.get_seconds_since_activity())
                         else:
-                            # No activity - check if we've exceeded threshold
-                            if session_started:
-                                inactivity_seconds = int(session_monitor.get_seconds_since_activity())
-                            else:
-                                inactivity_seconds = int(time.time() - last_mtime)
+                            inactivity_seconds = int(current_time - last_mtime)
 
-                            if inactivity_seconds > activity_timeout_seconds:
-                                # Inactivity timeout - kill the process
-                                print(f"\n⚠️  No activity for {inactivity_seconds}s (>{activity_timeout_seconds}s). Terminating process...")
-                                proc.kill()
-                                reader_thread.join(timeout=5)  # Wait briefly for output thread
-                                handle.write(f"\n# Inactivity Timeout\nProcess terminated after {inactivity_seconds} seconds of inactivity\n")
-                                handle.write(f"\n# Exit Code\nINACTIVITY_TIMEOUT\n")
-                                raise RunnerError(
-                                    f"Provider command timed out due to {inactivity_seconds} seconds of inactivity "
-                                    f"(threshold: {activity_timeout_seconds}s = {activity_timeout_seconds // 60} minutes). "
-                                    f"The AI may be stuck or waiting for input."
-                                )
-                            else:
-                                # Still within threshold
-                                print(f"[{datetime.now().strftime('%H:%M:%S')}] ⏳ No activity for {inactivity_seconds}s (max: {activity_timeout_seconds}s)")
-                    # If no activity timeout configured, just continue
+                        if inactivity_seconds > activity_timeout_seconds:
+                            # Inactivity timeout - kill the process
+                            print(f"\n⚠️  No activity for {inactivity_seconds}s (>{activity_timeout_seconds}s). Terminating process...")
+                            proc.kill()
+                            reader_thread.join(timeout=5)  # Wait briefly for output thread
+                            handle.write(f"\n# Inactivity Timeout\nProcess terminated after {inactivity_seconds} seconds of inactivity\n")
+                            handle.write(f"\n# Exit Code\nINACTIVITY_TIMEOUT\n")
+                            raise RunnerError(
+                                f"Provider command timed out due to {inactivity_seconds} seconds of inactivity "
+                                f"(threshold: {activity_timeout_seconds}s = {activity_timeout_seconds // 60} minutes). "
+                                f"The AI may be stuck or waiting for input."
+                            )
+                        elif inactivity_seconds > 60:
+                            # Show status update if inactive for more than 1 minute
+                            print(f"[{datetime.now().strftime('%H:%M:%S')}] ⏳ No activity for {inactivity_seconds}s (max: {activity_timeout_seconds}s)")
+
+                    # Continue loop
                     continue
         finally:
             # Clean up session monitor
