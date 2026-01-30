@@ -6,12 +6,17 @@ platform checks throughout the codebase.
 
 from __future__ import annotations
 
+import logging
 import os
 import platform
 import shlex
 import subprocess
+import time
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any
+
+logger = logging.getLogger(__name__)
 
 
 def format_command_string(command: list[str] | tuple[str, ...]) -> str:
@@ -207,3 +212,101 @@ def popen_command(
             encoding='utf-8' if text_mode else None,
             errors='replace' if text_mode else None,
         )
+
+
+def monitor_process_with_timeout(
+    process: subprocess.Popen[str],
+    timeout_seconds: int,
+    on_activity: Callable[[str], None] | None = None,
+) -> tuple[int | None, str | None]:
+    """Monitor a subprocess with activity timeout detection.
+
+    Args:
+        process: The subprocess to monitor
+        timeout_seconds: Maximum seconds of inactivity before timeout
+        on_activity: Optional callback for each line of output
+
+    Returns:
+        Tuple of (exit_code, error_message)
+        - exit_code is None if process timed out
+        - error_message is None if process completed successfully
+    """
+    last_activity = time.time()
+    output_buffer = []
+
+    while True:
+        # Check if process has exited
+        if process.poll() is not None:
+            # Process has exited
+            exit_code = process.returncode
+
+            # Collect any remaining output
+            if process.stdout:
+                try:
+                    remaining = process.stdout.read()
+                    if remaining:
+                        output_buffer.append(remaining)
+                        if on_activity:
+                            on_activity(remaining)
+                except Exception as e:
+                    logger.warning(f"Error reading remaining output: {e}")
+
+            # Check for error
+            if exit_code != 0:
+                error_msg = "".join(output_buffer[-100:])  # Last 100 lines
+                return exit_code, error_msg
+
+            return exit_code, None
+
+        # Check for output (activity)
+        if process.stdout:
+            try:
+                line = process.stdout.readline()
+                if line:
+                    output_buffer.append(line)
+                    last_activity = time.time()
+                    if on_activity:
+                        on_activity(line)
+            except Exception as e:
+                logger.warning(f"Error reading stdout: {e}")
+
+        # Check for timeout
+        if time.time() - last_activity > timeout_seconds:
+            logger.warning(
+                f"Process {process.pid} timed out after {timeout_seconds}s of inactivity"
+            )
+            try:
+                process.terminate()
+                time.sleep(5)  # Wait 5s for graceful shutdown
+                if process.poll() is None:
+                    process.kill()  # Force kill if still running
+            except Exception as e:
+                logger.error(f"Error terminating process: {e}")
+
+            return None, f"Process timed out after {timeout_seconds}s of inactivity"
+
+        # Small sleep to prevent busy-waiting
+        time.sleep(0.1)
+
+
+def safe_terminate_process(process: subprocess.Popen[Any], timeout: int = 5) -> None:
+    """Safely terminate a subprocess with graceful fallback to kill.
+
+    Args:
+        process: The subprocess to terminate
+        timeout: Seconds to wait for graceful termination before force kill
+    """
+    try:
+        process.terminate()
+        process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        logger.warning(
+            f"Process {process.pid} did not terminate gracefully, forcing kill"
+        )
+        try:
+            process.kill()
+            process.wait(timeout=2)
+        except Exception as e:
+            logger.error(f"Failed to kill process {process.pid}: {e}")
+    except Exception as e:
+        logger.error(f"Error terminating process {process.pid}: {e}")
