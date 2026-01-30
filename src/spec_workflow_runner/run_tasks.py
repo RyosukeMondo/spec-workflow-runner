@@ -372,11 +372,69 @@ def ensure_model(provider_name: str, explicit_model: str | None) -> str | None:
     )[0]
 
 
-def build_prompt(cfg: Config, spec_name: str, stats: TaskStats) -> str:
-    """Format the codex prompt using the config template."""
+def mark_task_status(tasks_file: Path, task_id: str, new_status: str) -> bool:
+    """Mark a task with a new status in tasks.md.
+
+    Args:
+        tasks_file: Path to tasks.md
+        task_id: Task ID (e.g., "1", "4.2")
+        new_status: New status: " " (pending), "-" (in-progress), "x" (completed)
+
+    Returns:
+        True if task was found and updated, False otherwise
+    """
+    if not tasks_file.exists():
+        return False
+
+    content = tasks_file.read_text(encoding="utf-8")
+    lines = content.splitlines()
+
+    # Pattern to match task line
+    import re
+    task_pattern = re.compile(rf"^(-\s+\[)[ x\-](\]\s+{re.escape(task_id)}\.\s+.+)$")
+
+    updated = False
+    for i, line in enumerate(lines):
+        match = task_pattern.match(line)
+        if match:
+            # Replace status character
+            lines[i] = f"{match.group(1)}{new_status}{match.group(2)}"
+            updated = True
+            break
+
+    if updated:
+        tasks_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    return updated
+
+
+def build_prompt(cfg: Config, spec_name: str, spec_path: Path, stats: TaskStats) -> str:
+    """Format the prompt using the config template with task details.
+
+    Parses tasks.md to find the first pending task and includes its details in the prompt.
+    """
+    from .tui.task_parser import parse_tasks_file, TaskStatus
+
+    # Parse tasks.md to find first pending task
+    tasks_file = spec_path / cfg.tasks_filename
+    tasks, warnings = parse_tasks_file(tasks_file)
+
+    # Find first pending task
+    pending_task = next((t for t in tasks if t.status == TaskStatus.PENDING), None)
+
+    if not pending_task:
+        # No pending tasks - return a simple message
+        return f"All tasks for spec '{spec_name}' are complete or in progress. Nothing to do."
+
+    # Format task description (join the description lines)
+    task_desc = "\n".join(pending_task.description) if pending_task.description else "No additional details provided."
+
     remaining = stats.total - stats.done
     context = {
         "spec_name": spec_name,
+        "task_id": pending_task.id,
+        "task_title": pending_task.title,
+        "task_description": task_desc,
         "tasks_total": stats.total,
         "tasks_done": stats.done,
         "tasks_remaining": remaining,
@@ -1166,7 +1224,17 @@ def run_loop(
             return
 
         iteration += 1
-        prompt = build_prompt(cfg, spec_name, stats)
+        prompt = build_prompt(cfg, spec_name, spec_path, stats)
+
+        # Mark task as in-progress before running
+        from .tui.task_parser import parse_tasks_file, TaskStatus
+        tasks_file = spec_path / cfg.tasks_filename
+        tasks, _ = parse_tasks_file(tasks_file)
+        pending_task = next((t for t in tasks if t.status == TaskStatus.PENDING), None)
+        if pending_task:
+            mark_task_status(tasks_file, pending_task.id, "-")
+            print(f"Marked task {pending_task.id} as in-progress")
+
         log_path = log_dir / cfg.log_file_template.format(index=iteration)
         run_provider(
             provider,
@@ -1179,9 +1247,16 @@ def run_loop(
             log_path=log_path,
         )
 
-        last_commit, no_commit_streak = _check_commit_progress(
+        new_last_commit, no_commit_streak = _check_commit_progress(
             project_path, last_commit, no_commit_streak, cfg
         )
+
+        # If a new commit was detected, mark the task as completed
+        if new_last_commit != last_commit and pending_task:
+            mark_task_status(tasks_file, pending_task.id, "x")
+            print(f"Marked task {pending_task.id} as completed")
+
+        last_commit = new_last_commit
 
 
 def main() -> int:
@@ -1197,7 +1272,8 @@ def main() -> int:
 
         if not args.dry_run:
             check_clean_working_tree(project)
-            check_mcp_server_exists(provider, project, cfg)
+            # Note: No longer checking for spec-workflow MCP server
+            # We parse tasks.md directly instead
 
         selection = _choose_spec_or_all(project, cfg, args.spec)
         if isinstance(selection, AllSpecsSentinel):
