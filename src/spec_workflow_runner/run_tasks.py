@@ -574,6 +574,7 @@ def _execute_provider_command(
         proc = popen_command(
             command,
             cwd=project_path,
+            stdin=subprocess.DEVNULL,  # Close stdin to prevent blocking
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,  # Merge stderr into stdout
             clean_claude_env=True,

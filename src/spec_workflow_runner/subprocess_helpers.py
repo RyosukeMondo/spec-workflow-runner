@@ -138,6 +138,7 @@ def popen_command(
     command: list[str] | tuple[str, ...],
     *,
     cwd: Path | str | None = None,
+    stdin: Any = None,
     stdout: Any = subprocess.PIPE,
     stderr: Any = subprocess.STDOUT,
     clean_claude_env: bool = False,
@@ -181,6 +182,7 @@ def popen_command(
         return subprocess.Popen(
             command_str,
             cwd=cwd,
+            stdin=stdin,
             stdout=stdout,
             stderr=stderr,
             bufsize=0,
@@ -195,6 +197,7 @@ def popen_command(
         return subprocess.Popen(
             command,
             cwd=cwd,
+            stdin=stdin,
             stdout=stdout,
             stderr=stderr,
             bufsize=0,
