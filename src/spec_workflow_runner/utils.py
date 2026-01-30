@@ -258,7 +258,7 @@ def _install_mcp_server(provider: Provider, project_path: Path, cfg: Config) -> 
                 f"   Error: {result.stderr.strip()}"
             )
 
-        print(f"✓ spec-workflow MCP server installed successfully for {provider.get_provider_name()}")
+        print(f"[OK] spec-workflow MCP server installed successfully for {provider.get_provider_name()}")
         logger.info("MCP server installation completed successfully")
 
     except Exception as err:
@@ -274,7 +274,7 @@ def check_clean_working_tree(repo_path: Path) -> None:
     if not has_uncommitted_changes(repo_path):
         return
 
-    print("\n⚠️  Warning: Uncommitted changes detected in the repository.")
+    print("\n[!]  Warning: Uncommitted changes detected in the repository.")
     print("   Commit detection may be unreliable during this run.")
 
 
@@ -304,7 +304,7 @@ def check_mcp_server_exists(
         )
 
         if result.returncode != 0:
-            print(f"\n⚠️  Warning: Could not list MCP servers for {provider.get_provider_name()}.")
+            print(f"\n[!]  Warning: Could not list MCP servers for {provider.get_provider_name()}.")
             print(f"   Command failed: {' '.join(command)}")
             print(f"   Error: {result.stderr.strip()}")
             print(f"\n   Task tracking may not work properly without the {server_name} MCP server.")
@@ -316,7 +316,7 @@ def check_mcp_server_exists(
             _install_mcp_server(provider, project_path, cfg)
             return
 
-        print(f"✓ {server_name} MCP server detected for {provider.get_provider_name()}")
+        print(f"[OK] {server_name} MCP server detected for {provider.get_provider_name()}")
 
     except FileNotFoundError as err:
         executable = provider.get_mcp_list_command().executable
@@ -369,7 +369,7 @@ def rotate_claude_account() -> bool:
             return True
 
         logger.warning(f"Failed to rotate Claude account: {result.stderr.strip()}")
-        print(f"⚠️  Failed to rotate Claude account: {result.stderr.strip()}")
+        print(f"[!]  Failed to rotate Claude account: {result.stderr.strip()}")
         return False
 
     except FileNotFoundError:

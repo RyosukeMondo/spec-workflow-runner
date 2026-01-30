@@ -231,7 +231,7 @@ def poll_for_pending_tasks(project: Path, cfg: Config) -> None:
 
         unfinished = list_unfinished_specs(project, cfg)
         if unfinished:
-            print(f"\n✓ Found {len(unfinished)} spec(s) with pending tasks!")
+            print(f"\n[OK] Found {len(unfinished)} spec(s) with pending tasks!")
             for idx, (name, spec_path) in enumerate(unfinished, start=1):
                 tasks_path = spec_path / cfg.tasks_filename
                 stats = read_task_stats(tasks_path)
@@ -278,7 +278,7 @@ def run_multiple_specs(
         print(f"Processing spec {idx}/{len(specs)}: '{spec_name}'")
         print(f"{'='*90}")
         run_loop(provider, cfg, project, spec_name, spec_path, dry_run)
-        print(f"✓ Completed spec '{spec_name}' ({idx}/{len(specs)})")
+        print(f"[OK] Completed spec '{spec_name}' ({idx}/{len(specs)})")
 
 
 def run_all_specs(
@@ -606,7 +606,7 @@ def _execute_provider_command(
 
                         if inactivity_seconds > activity_timeout_seconds:
                             # Inactivity timeout - kill the process
-                            print(f"\n⚠️  No file changes for {inactivity_seconds}s (>{activity_timeout_seconds}s). Terminating process...")
+                            print(f"\n[!]  No file changes for {inactivity_seconds}s (>{activity_timeout_seconds}s). Terminating process...")
                             proc.kill()
                             reader_thread.join(timeout=5)
                             handle.write(f"\n# Inactivity Timeout\nProcess terminated after {inactivity_seconds} seconds of inactivity\n")
@@ -643,7 +643,7 @@ def _execute_provider_command(
     if returncode != 0:
         # If process was killed due to "No messages returned", treat as potentially successful
         if has_no_messages_error and returncode == -9:  # -9 = SIGKILL
-            print(f"⚠️  Process terminated due to 'No messages returned' error")
+            print(f"[!]  Process terminated due to 'No messages returned' error")
             print(f"   Treating as potentially successful. Circuit breaker will stop if no progress.")
             print(f"Saved log: {log_path}")
             return  # Don't raise error - let circuit breaker handle it
@@ -732,7 +732,7 @@ def run_provider(
                     },
                 )
                 print(
-                    "⚠️  Claude CLI error: 'No messages returned'. "
+                    "[!]  Claude CLI error: 'No messages returned'. "
                     "This may indicate completion or a transient issue."
                 )
                 print("   Continuing to next iteration. Circuit breaker will stop if no progress.")
@@ -755,7 +755,7 @@ def run_provider(
                 )
 
                 # Try to reduce context by archiving implementation logs
-                print("⚠️  Activity timeout (no file changes detected). Attempting to reduce context...")
+                print("[!]  Activity timeout (no file changes detected). Attempting to reduce context...")
                 context_reduced = reduce_spec_context(project_path, spec_name, cfg)
 
                 if context_reduced:
@@ -769,7 +769,7 @@ def run_provider(
                             }
                         },
                     )
-                    print("✓ Context reduced by archiving implementation logs. Retrying...")
+                    print("[OK] Context reduced by archiving implementation logs. Retrying...")
                     # Retry immediately after reducing context, but increment attempt
                     attempt += 1
                     if attempt > cfg.max_retries:
@@ -805,7 +805,7 @@ def run_provider(
                             }
                         },
                     )
-                    print(f"⚠️  No logs to archive. Waiting {wait_seconds}s before retry...")
+                    print(f"[!]  No logs to archive. Waiting {wait_seconds}s before retry...")
                     time.sleep(wait_seconds)
                     attempt += 1
                     continue
@@ -848,7 +848,7 @@ def run_provider(
                         starting_claude_account = get_active_claude_account()
                         logger.info(f"Tracking starting Claude account: {starting_claude_account}")
 
-                    print("⚠️  Rate limit exceeded. Rotating Claude account...")
+                    print("[!]  Rate limit exceeded. Rotating Claude account...")
                     if rotate_claude_account():
                         current_account = get_active_claude_account()
 
@@ -867,7 +867,7 @@ def run_provider(
                             backoff_seconds = cfg.context_limit_wait_seconds
                             wait_minutes = backoff_seconds // 60
                             print(
-                                f"⚠️  All Claude accounts exhausted. "
+                                f"[!]  All Claude accounts exhausted. "
                                 f"Waiting {wait_minutes} minutes ({backoff_seconds}s) before retry..."
                             )
                             time.sleep(backoff_seconds)
@@ -889,13 +889,13 @@ def run_provider(
                         continue
                     else:
                         # Rotation failed, fall through to wait
-                        print("⚠️  Account rotation not available. Falling back to wait...")
+                        print("[!]  Account rotation not available. Falling back to wait...")
 
                 # For non-Claude providers or if rotation not available: wait before retrying
                 backoff_seconds = cfg.context_limit_wait_seconds
                 wait_minutes = backoff_seconds // 60
                 print(
-                    f"⚠️  Rate limit exceeded. "
+                    f"[!]  Rate limit exceeded. "
                     f"Waiting {wait_minutes} minutes ({backoff_seconds}s) before retry..."
                 )
                 time.sleep(backoff_seconds)
@@ -905,7 +905,7 @@ def run_provider(
             # Handle context limit errors
             if is_context_error:
                 # Try to reduce context by archiving implementation logs
-                print("⚠️  Context limit exceeded. Attempting to reduce context...")
+                print("[!]  Context limit exceeded. Attempting to reduce context...")
                 context_reduced = reduce_spec_context(project_path, spec_name, cfg)
 
                 if context_reduced:
@@ -919,7 +919,7 @@ def run_provider(
                             }
                         },
                     )
-                    print("✓ Context reduced by archiving implementation logs. Retrying...")
+                    print("[OK] Context reduced by archiving implementation logs. Retrying...")
                     # Retry immediately after reducing context
                     continue
 
@@ -931,7 +931,7 @@ def run_provider(
                         logger.info(f"Tracking starting Claude account: {starting_claude_account}")
 
                     # Rotate to next account
-                    print("⚠️  Context limit exceeded. Rotating Claude account...")
+                    print("[!]  Context limit exceeded. Rotating Claude account...")
                     if rotate_claude_account():
                         current_account = get_active_claude_account()
 
@@ -950,7 +950,7 @@ def run_provider(
                             backoff_seconds = cfg.context_limit_wait_seconds
                             wait_minutes = backoff_seconds // 60
                             print(
-                                f"⚠️  All Claude accounts exhausted. "
+                                f"[!]  All Claude accounts exhausted. "
                                 f"Waiting {wait_minutes} minutes ({backoff_seconds}s) before retry..."
                             )
                             time.sleep(backoff_seconds)
@@ -972,7 +972,7 @@ def run_provider(
                         continue
                     else:
                         # Rotation failed, fall through to wait
-                        print("⚠️  Account rotation failed. Falling back to wait...")
+                        print("[!]  Account rotation failed. Falling back to wait...")
 
                 # For non-Claude providers or if rotation failed: wait before retrying
                 backoff_seconds = cfg.context_limit_wait_seconds
@@ -992,7 +992,7 @@ def run_provider(
                     },
                 )
                 print(
-                    f"⚠️  Context limit exceeded (no logs to archive). "
+                    f"[!]  Context limit exceeded (no logs to archive). "
                     f"Waiting {wait_minutes} minutes ({backoff_seconds}s) before retry..."
                 )
                 time.sleep(backoff_seconds)
@@ -1016,7 +1016,7 @@ def run_provider(
                     },
                 )
                 print(
-                    f"⚠️  Attempt {attempt}/{cfg.max_retries} failed. "
+                    f"[!]  Attempt {attempt}/{cfg.max_retries} failed. "
                     f"Retrying in {backoff_seconds}s..."
                 )
                 time.sleep(backoff_seconds)
@@ -1048,7 +1048,7 @@ def _display_dry_run_spec_status(spec_name: str, spec_path: Path, stats: TaskSta
     print(f"Created: {created_date}")
     print(f"{'='*90}")
     if stats.done >= stats.total:
-        print("✓ All tasks complete. Nothing to run.")
+        print("[OK] All tasks complete. Nothing to run.")
     else:
         print(f"Would run provider to complete {stats.total - stats.done} remaining task(s).")
 
@@ -1069,7 +1069,7 @@ def _check_commit_progress(
     has_changes = has_uncommitted_changes(project_path)
     if has_changes:
         print(
-            f"⚠️  No new commit detected, but uncommitted changes exist! "
+            f"[!]  No new commit detected, but uncommitted changes exist! "
             f"Streak: {no_commit_streak}/{cfg.no_commit_limit}"
         )
         print("   The AI may have created/modified files but didn't commit them.")
