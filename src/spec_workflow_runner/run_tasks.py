@@ -491,12 +491,19 @@ def _execute_provider_command(
         assert proc.stdout is not None
         no_messages_detected = False
 
+        import sys
+        print("[DEBUG] Output reader thread started, waiting for Claude output...", flush=True)
+
+        line_count = 0
         for line in iter(proc.stdout.readline, b""):
             decoded = line.decode("utf-8", errors="replace")
-            print(decoded, end="")
+            if line_count == 0:
+                print("[DEBUG] First output line received from Claude", flush=True)
+            print(decoded, end="", flush=True)  # Force flush to console
             handle.write(decoded)
             handle.flush()
             output_lines.append(decoded)
+            line_count += 1
 
             # Detect "No messages returned" error early
             if "no messages returned" in decoded.lower() and not no_messages_detected:
@@ -516,6 +523,8 @@ def _execute_provider_command(
                     except Exception as e:
                         print(f"[DEBUG] Error terminating process: {e}")
                 break  # Exit the loop immediately after killing
+
+        print(f"\n[DEBUG] Output reader thread finished. Received {line_count} lines from Claude", flush=True)
 
     with log_path.open("w", encoding="utf-8") as handle:
         handle.write(header)
