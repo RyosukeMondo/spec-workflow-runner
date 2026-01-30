@@ -718,7 +718,7 @@ def discover_specs(project_path: Path, cfg: Config) -> list[tuple[str, Path]]:
 
 
 TASK_PATTERN = re.compile(
-    r"^-\s\[(?P<state>[ x-])\]",
+    r"^-\s\[(?P<state>[ x-])\]\s*(?:(?P<tasknum>\d+)\.\s*)?(?P<title>.+)$",
     re.MULTILINE | re.IGNORECASE,
 )
 
