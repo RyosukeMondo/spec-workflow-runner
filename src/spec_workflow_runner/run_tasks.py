@@ -569,7 +569,7 @@ def _execute_provider_command(
 
         # Note: Session monitoring only works for interactive mode, not --print mode
         # In --print mode, we can only monitor file system changes
-        print(f"📊 Monitoring file system activity (--print mode has no session logs)...")
+        print(f"[MONITOR] Monitoring file system activity (--print mode has no session logs)...")
         print(f"\n{'='*80}")
         print(f"Claude Output:")
         print(f"{'='*80}\n")
@@ -597,7 +597,7 @@ def _execute_provider_command(
 
                     if file_has_activity:
                         last_mtime = current_mtime
-                        print(f"[{datetime.now().strftime('%H:%M:%S')}] 📝 File modified - Claude is working")
+                        print(f"[{datetime.now().strftime('%H:%M:%S')}] [FILE] File modified - Claude is working")
 
                     # Check for timeout at configured interval
                     if activity_timeout_seconds and (current_time - last_timeout_check) >= activity_check_interval_seconds:
