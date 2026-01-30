@@ -580,6 +580,9 @@ def _execute_provider_command(
             env_additions={"PYTHONUNBUFFERED": "1"},
         )
 
+        print(f"[DEBUG] Claude process started with PID: {proc.pid}", flush=True)
+        print(f"[DEBUG] Process poll status: {proc.poll()}", flush=True)
+
         # Start output reading thread
         reader_thread = threading.Thread(
             target=read_output,
@@ -587,6 +590,7 @@ def _execute_provider_command(
             daemon=True
         )
         reader_thread.start()
+        print("[DEBUG] Reader thread started", flush=True)
 
         # Note: Session monitoring only works for interactive mode, not --print mode
         # In --print mode, we can only monitor file system changes
