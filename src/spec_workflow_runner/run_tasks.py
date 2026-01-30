@@ -523,6 +523,7 @@ def _execute_provider_command(
             command,
             cwd=project_path,
             stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,  # Merge stderr into stdout
             clean_claude_env=True,
             env_additions={"PYTHONUNBUFFERED": "1"},
         )
@@ -538,6 +539,9 @@ def _execute_provider_command(
         # Note: Session monitoring only works for interactive mode, not --print mode
         # In --print mode, we can only monitor file system changes
         print(f"📊 Monitoring file system activity (--print mode has no session logs)...")
+        print(f"\n{'='*80}")
+        print(f"Claude Output:")
+        print(f"{'='*80}\n")
         session_started = False
         session_monitor = None
 
