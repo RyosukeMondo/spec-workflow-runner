@@ -25,8 +25,10 @@ from .utils import (
     choose_option,
     discover_projects,
     discover_specs,
+    display_overall_progress,
     display_spec_queue,
     get_active_claude_account,
+    get_all_spec_progress,
     get_current_commit,
     has_uncommitted_changes,
     is_context_limit_error,
@@ -35,6 +37,7 @@ from .utils import (
     is_timeout_error,
     list_unfinished_specs,
     load_config,
+    read_task_details,
     read_task_stats,
     reduce_spec_context,
     rotate_claude_account,
@@ -303,6 +306,9 @@ def run_all_specs(
     print("Will poll every 10 minutes for new specs when all tasks are complete.\n")
 
     while True:
+        # Display overall progress summary
+        display_overall_progress(project, cfg)
+
         unfinished = list_unfinished_specs(project, cfg)
         if not unfinished:
             current_time = datetime.now().strftime("%H:%M:%S")
@@ -600,7 +606,7 @@ def _execute_provider_command(
     activity_timeout_seconds: int | None = None,
     activity_check_interval_seconds: int = 300,
     ignore_dirs: tuple[str, ...] = ()
-) -> None:
+) -> int:
     """Execute provider command and stream output to log with activity-based timeout.
 
     Args:
@@ -631,6 +637,8 @@ def _execute_provider_command(
 
     output_lines: list[str] = []
     early_termination_flag = {"triggered": False}  # Use dict for mutability across threads
+    spawned_agents: list[dict] = []  # Track agent info spawned via Task tool
+    pending_tool_uses: dict[str, str] = {}  # Map tool_use id -> tool name
 
     def read_output(proc: subprocess.Popen, handle: TextIO, output_lines: list[str]) -> None:
         """Read process output in background thread.
@@ -652,7 +660,6 @@ def _execute_provider_command(
             if not line:  # Empty bytes means EOF
                 break
             decoded = line.decode("utf-8", errors="replace").strip()
-            if line_count == 0:
 
             # Write raw JSONL to log file
             handle.write(decoded + "\n")
@@ -683,7 +690,11 @@ def _execute_provider_command(
                                     print(item.get("text", ""), flush=True)
                                 elif item.get("type") == "tool_use":
                                     tool_name = item.get("name", "unknown")
+                                    tool_use_id = item.get("id")
                                     print(f"[Using tool: {tool_name}]", flush=True)
+                                    # Track tool use for later result matching
+                                    if tool_use_id:
+                                        pending_tool_uses[tool_use_id] = tool_name
                                 elif item.get("type") == "thinking":
                                     thinking = item.get("thinking", "")[:150]
                                     print(f"[Thinking: {thinking}...]", flush=True)
@@ -692,6 +703,34 @@ def _execute_provider_command(
                     # Show final result
                     if "result" in data:
                         print(f"\n[Result: {data['result'][:100]}...]", flush=True)
+
+                elif msg_type == "tool_result":
+                    # Check if this is a result from a Task tool
+                    tool_use_id = data.get("tool_use_id")
+                    if tool_use_id and pending_tool_uses.get(tool_use_id) == "Task":
+                        # Extract agent information from Task tool result
+                        content = data.get("content", "")
+                        # Try to parse agent ID from the result
+                        import re
+                        # Look for patterns like "agent ID: xyz" or similar
+                        if isinstance(content, str):
+                            agent_match = re.search(r'agent[_\s]+(?:ID|id)[\s:]+([a-zA-Z0-9_-]+)', content, re.IGNORECASE)
+                            if agent_match:
+                                agent_id = agent_match.group(1)
+                                spawned_agents.append({
+                                    "agent_id": agent_id,
+                                    "tool_use_id": tool_use_id,
+                                    "content": content[:200]
+                                })
+                                print(f"[!]  Task agent detected: {agent_id}", flush=True)
+                            else:
+                                # No clear agent ID, but still record the Task spawn
+                                spawned_agents.append({
+                                    "agent_id": f"unknown_{tool_use_id}",
+                                    "tool_use_id": tool_use_id,
+                                    "content": content[:200]
+                                })
+                                print(f"[!]  Task agent spawned (id: {tool_use_id})", flush=True)
 
                 # If message type not handled, silently skip (don't spam console)
 
@@ -715,6 +754,7 @@ def _execute_provider_command(
                         if proc.poll() is None:  # Still alive
                             proc.kill()  # Force kill if terminate didn't work
                     except Exception as e:
+                        pass  # Ignore errors during termination
                 break  # Exit the loop immediately after killing
 
 
@@ -792,7 +832,7 @@ def _execute_provider_command(
                             # Show periodic status
                             mins = inactivity_seconds // 60
                             secs = inactivity_seconds % 60
-                            print(f"[{datetime.now().strftime('%H:%M:%S')}] ⏳ Running... (no file changes for {mins}m {secs}s, max: {activity_timeout_seconds // 60}m)")
+                            print(f"[{datetime.now().strftime('%H:%M:%S')}] [WAIT] Running... (no file changes for {mins}m {secs}s, max: {activity_timeout_seconds // 60}m)")
 
                     # Continue loop
                     continue
@@ -818,11 +858,99 @@ def _execute_provider_command(
             print(f"[!]  Process terminated due to 'No messages returned' error")
             print(f"   Treating as potentially successful. Circuit breaker will stop if no progress.")
             print(f"Saved log: {log_path}")
-            return  # Don't raise error - let circuit breaker handle it
+            return 0  # Don't raise error - let circuit breaker handle it
 
         # Include output in error message for better error detection
         raise RunnerError(f"Provider command failed. Output: {output_text}")
     print(f"Saved log: {log_path}")
+
+    # No agents spawned - normal completion
+    if not spawned_agents:
+        return 0
+
+    # Check if Claude spawned Task agents despite instructions
+    if spawned_agents:
+        print(f"\n{'='*80}")
+        print(f"[!]  WARNING: Claude spawned {len(spawned_agents)} Task agent(s) despite instructions!")
+        print(f"{'='*80}")
+        for i, agent_info in enumerate(spawned_agents, 1):
+            agent_id = agent_info["agent_id"]
+            print(f"  {i}. Agent: {agent_id}")
+
+        print(f"\n[WAIT] Waiting for spawned agents to complete...")
+        print(f"   Monitoring file system activity and commits")
+        print(f"   Will wait up to 10 minutes, or until 60s of inactivity\n")
+
+        # Monitor for agent completion
+        start_time = time.time()
+        max_total_wait = 600  # 10 minutes maximum
+        inactivity_threshold = 60  # 60 seconds of no activity = done
+
+        initial_commit = get_current_commit(project_path)
+        last_activity_time = time.time()
+        last_mtime = _get_latest_file_mtime(project_path, ignore_dirs)
+        commits_detected = []
+
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Starting agent monitoring...")
+
+        while True:
+            elapsed = time.time() - start_time
+            inactivity = time.time() - last_activity_time
+
+            # Check for maximum timeout
+            if elapsed > max_total_wait:
+                print(f"\n[{datetime.now().strftime('%H:%M:%S')}] [TIMEOUT] Maximum wait time reached (10 minutes)")
+                break
+
+            # Check for file system activity
+            current_mtime = _get_latest_file_mtime(project_path, ignore_dirs)
+            if current_mtime > last_mtime:
+                last_mtime = current_mtime
+                last_activity_time = time.time()
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] [FILE] File activity detected (agents working...)")
+
+            # Check for new commits
+            current_commit = get_current_commit(project_path)
+            if current_commit != initial_commit and current_commit not in commits_detected:
+                commits_detected.append(current_commit)
+                initial_commit = current_commit
+                last_activity_time = time.time()
+                # Get commit message
+                try:
+                    result = subprocess.run(
+                        ["git", "log", "-1", "--pretty=%s"],
+                        cwd=project_path,
+                        capture_output=True,
+                        text=True,
+                        check=True
+                    )
+                    commit_msg = result.stdout.strip()
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] [OK] New commit detected: {commit_msg}")
+                except Exception:
+                    print(f"[{datetime.now().strftime('%H:%M:%S')}] [OK] New commit detected: {current_commit[:8]}")
+
+            # Check for inactivity threshold
+            if inactivity > inactivity_threshold:
+                print(f"\n[{datetime.now().strftime('%H:%M:%S')}] [DONE] No activity for {int(inactivity)}s - agents appear complete")
+                break
+
+            # Show periodic status
+            if int(elapsed) % 10 == 0 and int(elapsed) > 0:
+                mins_elapsed = int(elapsed) // 60
+                secs_elapsed = int(elapsed) % 60
+                inactive_secs = int(inactivity)
+                print(f"[{datetime.now().strftime('%H:%M:%S')}] [WAIT] Waiting... ({mins_elapsed}m {secs_elapsed}s elapsed, {inactive_secs}s inactive, {len(commits_detected)} commits)")
+
+            time.sleep(5)  # Check every 5 seconds
+
+        print(f"\n{'='*80}")
+        print(f"[DONE] Agent monitoring complete")
+        print(f"  - Total time: {int(elapsed)}s")
+        print(f"  - Commits detected: {len(commits_detected)}")
+        print(f"{'='*80}\n")
+
+        # Return number of commits detected during agent work
+        return len(commits_detected)
 
 
 def run_provider(
@@ -835,7 +963,7 @@ def run_provider(
     spec_name: str,
     iteration: int,
     log_path: Path,
-) -> None:
+) -> int:
     """Execute the provider command and stream output into a log file."""
     log_path.parent.mkdir(parents=True, exist_ok=True)
     provider_cmd = provider.build_command(prompt, project_path, cfg.codex_config_overrides)
@@ -845,7 +973,7 @@ def run_provider(
 
     if dry_run:
         _write_dry_run_log(log_path, header, formatted_command)
-        return
+        return 0
 
     # Retry loop with exponential backoff
     last_error: Exception | None = None
@@ -854,7 +982,7 @@ def run_provider(
 
     while True:
         try:
-            _execute_provider_command(
+            commits_from_agents = _execute_provider_command(
                 command,
                 project_path,
                 header,
@@ -874,7 +1002,7 @@ def run_provider(
                         }
                     },
                 )
-            return  # Success - exit retry loop
+            return commits_from_agents  # Success - exit retry loop
         except RunnerError as err:
             last_error = err
 
@@ -884,9 +1012,6 @@ def run_provider(
             is_context_error = is_context_limit_error(error_message)
             is_timeout = is_timeout_error(error_message)
             is_no_messages = is_no_messages_error(error_message)
-
-            # DEBUG: Print error type detection results
-            if is_no_messages:
 
             # Handle "No messages returned" error - treat as potentially successful
             if is_no_messages:
@@ -907,7 +1032,7 @@ def run_provider(
                 )
                 print("   Continuing to next iteration. Circuit breaker will stop if no progress.")
                 # Return successfully - let circuit breaker handle repeated no-commit scenarios
-                return
+                return 0
 
             # Handle timeout errors
             if is_timeout:
@@ -1258,6 +1383,54 @@ def _check_commit_progress(
     return last_commit, no_commit_streak
 
 
+def run_pre_session_validation(
+    provider: Provider,
+    cfg: Config,
+    project_path: Path,
+    spec_name: str,
+    spec_path: Path,
+) -> None:
+    """
+    Run pre-session validation to ensure tasks.md is synced with codebase.
+
+    This validates and updates tasks.md before any work begins:
+    - Verifies format matches tasks-template.md
+    - Checks codebase to see what's actually complete
+    - Updates checkboxes and status fields to reflect reality
+    - Commits the synced tasks.md
+    """
+    if not cfg.enable_pre_session_validation:
+        return
+
+    print(f"\n{'='*80}")
+    print(f"PRE-SESSION VALIDATION: {spec_name}")
+    print(f"{'='*80}\n")
+    print("Validating and syncing tasks.md with codebase status...\n")
+
+    prompt = cfg.pre_session_validation_prompt.format(spec_name=spec_name)
+    log_dir = project_path / cfg.log_dir_name / spec_name
+    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = log_dir / "validation.log"
+
+    # Run validation session
+    try:
+        _ = run_provider(
+            provider=provider,
+            cfg=cfg,
+            project_path=project_path,
+            prompt=prompt,
+            dry_run=False,
+            spec_name=spec_name,
+            iteration=0,
+            log_path=log_path,
+        )
+        print("\n[OK] Pre-session validation complete - tasks.md is synced\n")
+    except Exception as e:
+        print("\n[!]  Pre-session validation failed, but continuing anyway...")
+        print(f"    Error: {e}")
+        print(f"    Check {log_path} for details\n")
+
+
 def run_loop(
     provider: Provider,
     cfg: Config,
@@ -1277,6 +1450,9 @@ def run_loop(
         _display_dry_run_spec_status(spec_name, spec_path, stats)
         return
 
+    # Run pre-session validation to sync tasks.md with codebase
+    run_pre_session_validation(provider, cfg, project_path, spec_name, spec_path)
+
     no_commit_streak = 0
     iteration = 0
     log_dir = project_path / cfg.log_dir_name / spec_name
@@ -1285,34 +1461,48 @@ def run_loop(
     while True:
         stats = read_task_stats(tasks_path)
         remaining = stats.total - stats.done
-        print(f"\nCurrent status ({spec_name}): {stats.summary()}")
+
+        # Display enhanced progress information
+        print(f"\n{'=' * 80}")
+        print(f"SPEC: {spec_name}")
+        print(f"{'=' * 80}")
+        print(f"Progress: {stats.summary()}")
+        print(f"{stats.progress_bar()}")
+
+        # Show next pending tasks
+        task_details = read_task_details(tasks_path)
+        pending_tasks = [t for t in task_details if t.status == "pending"]
+        in_progress_tasks = [t for t in task_details if t.status == "in_progress"]
+
+        if in_progress_tasks:
+            print(f"\nIn Progress:")
+            for task in in_progress_tasks[:3]:  # Show up to 3
+                print(f"  - {task.task_id}: {task.title[:60]}")
+
+        if pending_tasks:
+            print(f"\nNext Pending Tasks:")
+            for task in pending_tasks[:3]:  # Show up to 3
+                print(f"  - {task.task_id}: {task.title[:60]}")
+
+        print(f"{'=' * 80}\n")
+
         if remaining <= 0:
-            print("All tasks complete. Nothing more to run.")
+            print("[OK] All tasks complete. Nothing more to run.")
             return
 
         iteration += 1
-        prompt = build_prompt(cfg, spec_name, spec_path, stats)
 
-        # Mark task as in-progress before running
-        from .tui.task_parser import parse_tasks_file, TaskStatus
-        tasks_file = spec_path / cfg.tasks_filename
-        tasks, _ = parse_tasks_file(tasks_file)
-        pending_task = next((t for t in tasks if t.status == TaskStatus.PENDING), None)
-
-        # Try alternate format if standard format has no pending tasks
-        if not pending_task:
-            alt_tasks = parse_tasks_alternate_format(tasks_file)
-            alt_pending = next((t for t in alt_tasks if t["status"] == "pending"), None)
-            if alt_pending:
-                # Use a simple dict to store task info
-                pending_task = type('obj', (object,), {'id': alt_pending["id"]})()
-
-        if pending_task:
-            mark_task_status(tasks_file, pending_task.id, "-")
-            print(f"Marked task {pending_task.id} as in-progress")
+        # Build prompt with progress summary (no specific task assignment)
+        progress_summary = f"{stats.done}/{stats.total} tasks complete ({stats.pending} pending, {stats.in_progress} in progress)"
+        prompt = cfg.prompt_template.format(
+            spec_name=spec_name,
+            progress_summary=progress_summary
+        )
 
         log_path = log_dir / cfg.log_file_template.format(index=iteration)
-        run_provider(
+        print(f"\n[Iteration {iteration}] Letting Claude choose what to work on...")
+
+        agent_commits = run_provider(
             provider,
             cfg,
             project_path,
@@ -1327,10 +1517,22 @@ def run_loop(
             project_path, last_commit, no_commit_streak, cfg
         )
 
-        # If a new commit was detected, mark the task as completed
-        if new_last_commit != last_commit and pending_task:
-            mark_task_status(tasks_file, pending_task.id, "x")
-            print(f"Marked task {pending_task.id} as completed")
+        # Check if progress was made
+        has_new_commit = new_last_commit != last_commit
+        has_agent_commits = agent_commits > 0
+
+        if has_new_commit or has_agent_commits:
+            # Progress made - reset circuit breaker
+            if has_agent_commits:
+                print(f"[OK] Progress made (agents: {agent_commits} commit(s))")
+            else:
+                print(f"[OK] Progress made (new commit)")
+            no_commit_streak = 0
+        else:
+            # No commits, but Claude might have just updated tasks.md
+            # Check if tasks.md was modified
+            print(f"[!]  No commits detected this iteration")
+            print(f"     Circuit breaker streak: {no_commit_streak}/{cfg.no_commit_limit}")
 
         last_commit = new_last_commit
 

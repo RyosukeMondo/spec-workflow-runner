@@ -410,6 +410,8 @@ class Config:
     monitor_refresh_seconds: int
     cache_dir: Path
     cache_max_age_days: int
+    pre_session_validation_prompt: str = ""
+    enable_pre_session_validation: bool = False
     codex_config_overrides: tuple[tuple[str, str], ...] = ()
     tui_refresh_seconds: int = 2
     tui_log_tail_lines: int = 200
@@ -498,6 +500,8 @@ class Config:
             monitor_refresh_seconds=int(payload.get("monitor_refresh_seconds", 5)),
             cache_dir=cache_dir,
             cache_max_age_days=int(payload.get("cache_max_age_days", 7)),
+            pre_session_validation_prompt=payload.get("pre_session_validation_prompt", ""),
+            enable_pre_session_validation=bool(payload.get("enable_pre_session_validation", False)),
             codex_config_overrides=tuple(overrides),
             tui_refresh_seconds=tui_refresh_seconds,
             tui_log_tail_lines=tui_log_tail_lines,
@@ -524,11 +528,63 @@ class TaskStats:
     def total(self) -> int:
         return self.done + self.pending + self.in_progress
 
+    @property
+    def completion_percentage(self) -> float:
+        """Calculate completion percentage."""
+        if self.total == 0:
+            return 0.0
+        return (self.done / self.total) * 100
+
     def summary(self) -> str:
         return (
             f"{self.done}/{self.total} complete "
             f"({self.in_progress} in progress, {self.pending} pending)"
         )
+
+    def progress_bar(self, width: int = 40) -> str:
+        """Generate a visual progress bar."""
+        if self.total == 0:
+            return "[" + " " * width + "] 0%"
+
+        filled = int((self.done / self.total) * width)
+        in_prog = int((self.in_progress / self.total) * width)
+
+        bar = "=" * filled
+        if in_prog > 0:
+            bar += ">" * min(in_prog, width - filled)
+        bar += " " * (width - len(bar))
+
+        percentage = self.completion_percentage
+        return f"[{bar}] {percentage:.1f}%"
+
+
+@dataclass(frozen=True)
+class TaskDetail:
+    """Detailed information about a single task."""
+
+    task_id: str
+    title: str
+    status: str  # "pending", "in_progress", or "completed"
+    description: str = ""
+
+
+@dataclass(frozen=True)
+class SpecProgress:
+    """Progress information for a single spec."""
+
+    name: str
+    path: Path
+    stats: TaskStats
+    creation_time: float
+
+    @property
+    def is_complete(self) -> bool:
+        return self.stats.done >= self.stats.total
+
+    def summary_line(self) -> str:
+        """One-line summary of spec progress."""
+        status = "[DONE]" if self.is_complete else "[ACTIVE]"
+        return f"{status} {self.name}: {self.stats.progress_bar()}"
 
 
 def load_config(path: Path) -> Config:
@@ -668,7 +724,7 @@ TASK_PATTERN = re.compile(
 
 # Pattern for alternate heading format: ### TASK-ID: Title
 HEADING_TASK_PATTERN = re.compile(
-    r"^###\s+([A-Z]+-\d+):",
+    r"^###\s+([A-Z]+-\d+):\s*(.+)$",
     re.MULTILINE,
 )
 
@@ -747,6 +803,97 @@ def read_task_stats(tasks_path: Path) -> TaskStats:
     return TaskStats(done=done, pending=pending, in_progress=in_progress)
 
 
+def read_task_details(tasks_path: Path) -> list[TaskDetail]:
+    """Parse detailed task information from tasks.md.
+
+    Returns a list of TaskDetail objects with task ID, title, status, and description.
+    """
+    text = tasks_path.read_text(encoding="utf-8")
+
+    # Extract Tasks section
+    tasks_section_start = text.find("## Tasks")
+    if tasks_section_start == -1:
+        task_text = text
+    else:
+        task_text_start = tasks_section_start + len("## Tasks")
+        next_section = text.find("\n## ", task_text_start)
+        if next_section == -1:
+            task_text = text[tasks_section_start:]
+        else:
+            task_text = text[tasks_section_start:next_section]
+
+    tasks: list[TaskDetail] = []
+
+    # Try heading format first
+    heading_matches = list(HEADING_TASK_PATTERN.finditer(task_text))
+
+    if heading_matches:
+        # Heading format
+        for i, heading_match in enumerate(heading_matches):
+            task_id = heading_match.group(1)
+            title = heading_match.group(2).strip()
+
+            # Extract task section
+            start_pos = heading_match.start()
+            if i + 1 < len(heading_matches):
+                end_pos = heading_matches[i + 1].start()
+            else:
+                end_pos = len(task_text)
+
+            task_section = task_text[start_pos:end_pos]
+
+            # Extract status
+            status_match = STATUS_FIELD_PATTERN.search(task_section)
+            if status_match:
+                status_raw = status_match.group(1).lower().strip()
+                if status_raw == "completed":
+                    status = "completed"
+                elif status_raw == "in progress":
+                    status = "in_progress"
+                else:
+                    status = "pending"
+            else:
+                status = "pending"
+
+            # Extract description (text after status field)
+            desc_lines = []
+            for line in task_section.split("\n")[2:]:  # Skip heading and status
+                line = line.strip()
+                if line and not line.startswith("###"):
+                    desc_lines.append(line)
+
+            description = " ".join(desc_lines)[:200]  # Limit to 200 chars
+
+            tasks.append(TaskDetail(
+                task_id=task_id,
+                title=title,
+                status=status,
+                description=description
+            ))
+    else:
+        # Checkbox format
+        for match in TASK_PATTERN.finditer(task_text):
+            state = match.group("state").lower()
+            task_num = match.group("tasknum")
+            title = match.group("title").strip()
+
+            if state == "x":
+                status = "completed"
+            elif state == "-":
+                status = "in_progress"
+            else:
+                status = "pending"
+
+            tasks.append(TaskDetail(
+                task_id=task_num or str(len(tasks) + 1),
+                title=title,
+                status=status,
+                description=""
+            ))
+
+    return tasks
+
+
 def list_unfinished_specs(project: Path, cfg: Config) -> list[tuple[str, Path]]:
     """Return specs with unfinished tasks, sorted by requirements.md creation time (oldest first)."""
     unfinished_with_ctime: list[tuple[float, str, Path]] = []
@@ -771,6 +918,89 @@ def list_unfinished_specs(project: Path, cfg: Config) -> list[tuple[str, Path]]:
 
     # Return without the timestamp
     return [(name, spec_path) for _, name, spec_path in unfinished_with_ctime]
+
+
+def get_all_spec_progress(project: Path, cfg: Config) -> list[SpecProgress]:
+    """Get progress information for all specs."""
+    progress_list: list[SpecProgress] = []
+
+    for name, spec_path in discover_specs(project, cfg):
+        tasks_path = spec_path / cfg.tasks_filename
+        if not tasks_path.exists():
+            continue
+
+        stats = read_task_stats(tasks_path)
+        if stats.total == 0:
+            continue
+
+        # Get creation time
+        requirements_path = spec_path / "requirements.md"
+        if requirements_path.exists():
+            ctime = requirements_path.stat().st_ctime
+        else:
+            ctime = spec_path.stat().st_ctime
+
+        progress_list.append(SpecProgress(
+            name=name,
+            path=spec_path,
+            stats=stats,
+            creation_time=ctime
+        ))
+
+    # Sort by creation time (oldest first)
+    progress_list.sort(key=lambda x: x.creation_time)
+
+    return progress_list
+
+
+def display_overall_progress(project: Path, cfg: Config) -> None:
+    """Display overall progress across all specs."""
+    progress_list = get_all_spec_progress(project, cfg)
+
+    if not progress_list:
+        print("\nNo specs found.")
+        return
+
+    # Calculate overall statistics
+    total_specs = len(progress_list)
+    completed_specs = sum(1 for p in progress_list if p.is_complete)
+    total_tasks = sum(p.stats.total for p in progress_list)
+    completed_tasks = sum(p.stats.done for p in progress_list)
+    in_progress_tasks = sum(p.stats.in_progress for p in progress_list)
+    pending_tasks = sum(p.stats.pending for p in progress_list)
+
+    print("\n" + "=" * 80)
+    print("OVERALL PROGRESS SUMMARY")
+    print("=" * 80)
+    print(f"\nSpecs: {completed_specs}/{total_specs} completed")
+    print(f"Tasks: {completed_tasks}/{total_tasks} completed " +
+          f"({in_progress_tasks} in progress, {pending_tasks} pending)")
+
+    if total_tasks > 0:
+        overall_percentage = (completed_tasks / total_tasks) * 100
+        # Create overall progress bar (ASCII-safe for Windows)
+        width = 60
+        filled = int((completed_tasks / total_tasks) * width)
+        bar = "=" * filled + "." * (width - filled)
+        print(f"\n[{bar}] {overall_percentage:.1f}%")
+
+    print("\n" + "-" * 80)
+    print("SPEC BREAKDOWN:")
+    print("-" * 80)
+
+    for progress in progress_list:
+        print(f"\n{progress.summary_line()}")
+
+        # Show next pending task if spec is not complete
+        if not progress.is_complete:
+            tasks_path = progress.path / cfg.tasks_filename
+            details = read_task_details(tasks_path)
+            next_tasks = [t for t in details if t.status == "pending"]
+            if next_tasks:
+                next_task = next_tasks[0]
+                print(f"   Next: {next_task.task_id} - {next_task.title[:60]}")
+
+    print("\n" + "=" * 80 + "\n")
 
 
 def display_spec_queue(project: Path, cfg: Config) -> None:
