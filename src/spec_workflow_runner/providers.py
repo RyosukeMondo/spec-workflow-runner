@@ -135,17 +135,9 @@ class ClaudeProvider(Provider):
         # Use stream-json for real-time output visibility (requires --verbose)
         args.extend(["--output-format", "stream-json", "--verbose"])
 
-        # Load MCP servers from project settings if available
-        # Use minimal config to avoid hooks that block in --print mode
-        minimal_config_path = project_path / ".claude" / "mcp-only.json"
-        settings_path = project_path / ".claude" / "settings.json"
-
-        if minimal_config_path.exists():
-            args.extend(["--mcp-config", str(minimal_config_path)])
-        elif settings_path.exists():
-            # Fallback to full settings if minimal doesn't exist
-            # WARNING: May be slow if settings has SessionStart hooks
-            args.extend(["--mcp-config", str(settings_path)])
+        # DO NOT load project MCP config in --print mode - it causes Claude to hang
+        # Instead, rely on global MCP config (~/.claude/settings.json)
+        # TODO: Investigate why --mcp-config causes readline() to block in subprocess
 
         args.append(prompt)
         return ProviderCommand(executable=self._executable, args=tuple(args))
