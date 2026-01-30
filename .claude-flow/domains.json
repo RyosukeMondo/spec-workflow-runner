@@ -1,0 +1,42 @@
+{
+  "domains": {
+    "core": {
+      "description": "Core workflow orchestration and task management",
+      "modules": [
+        "src/spec_workflow_runner/run_tasks.py",
+        "src/spec_workflow_runner/utils.py",
+        "src/spec_workflow_runner/providers.py"
+      ],
+      "agents": ["coordinator", "architect", "coder", "reviewer"]
+    },
+    "tui": {
+      "description": "Terminal UI and user interaction",
+      "modules": [
+        "src/spec_workflow_runner/tui/"
+      ],
+      "agents": ["ui-specialist", "coder", "tester"]
+    },
+    "task-management": {
+      "description": "Task parsing, validation, and auto-fixing",
+      "modules": [
+        "src/spec_workflow_runner/task_fixer/",
+        "src/spec_workflow_runner/tui/task_parser.py"
+      ],
+      "agents": ["validator", "coder", "tester"]
+    },
+    "testing": {
+      "description": "Test infrastructure and quality assurance",
+      "modules": [
+        "tests/"
+      ],
+      "agents": ["tester", "qa-engineer", "reviewer"]
+    },
+    "security": {
+      "description": "Security, permissions, and validation",
+      "modules": [
+        "src/spec_workflow_runner/subprocess_helpers.py"
+      ],
+      "agents": ["security-architect", "auditor"]
+    }
+  }
+}

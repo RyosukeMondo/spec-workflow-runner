@@ -1,0 +1,144 @@
+{
+  "workflows": {
+    "implement-spec-task": {
+      "description": "Implement a single task from tasks.md",
+      "topology": "hierarchical",
+      "agents": ["coordinator", "architect", "coder", "tester", "reviewer"],
+      "steps": [
+        {
+          "agent": "coordinator",
+          "action": "Read tasks.md and identify next pending task"
+        },
+        {
+          "agent": "architect",
+          "action": "Review existing code patterns and design approach"
+        },
+        {
+          "agent": "coder",
+          "action": "Implement the task following SOLID principles"
+        },
+        {
+          "agent": "tester",
+          "action": "Write tests with 80%+ coverage"
+        },
+        {
+          "agent": "reviewer",
+          "action": "Code review and quality check"
+        },
+        {
+          "agent": "coordinator",
+          "action": "Update tasks.md and create commit"
+        }
+      ],
+      "success_criteria": [
+        "All tests pass",
+        "Coverage >= 80%",
+        "Linting passes (ruff, black, mypy)",
+        "Task marked complete in tasks.md",
+        "Atomic commit created"
+      ]
+    },
+    "fix-bug": {
+      "description": "Fix a bug with root cause analysis",
+      "topology": "flat",
+      "agents": ["coordinator", "coder", "tester"],
+      "steps": [
+        {
+          "agent": "coordinator",
+          "action": "Analyze bug report and reproduce issue"
+        },
+        {
+          "agent": "coder",
+          "action": "Implement fix with fail-fast validation"
+        },
+        {
+          "agent": "tester",
+          "action": "Add regression test and verify fix"
+        }
+      ],
+      "model": "haiku",
+      "max_agents": 3
+    },
+    "create-new-feature": {
+      "description": "Design and implement a new feature",
+      "topology": "hierarchical",
+      "agents": ["coordinator", "architect", "coder", "tester", "reviewer", "qa-engineer"],
+      "steps": [
+        {
+          "agent": "coordinator",
+          "action": "Parse requirements and create task breakdown"
+        },
+        {
+          "agent": "architect",
+          "action": "Design architecture following SOLID + DI patterns"
+        },
+        {
+          "agent": "coder",
+          "action": "Implement feature with dependency injection"
+        },
+        {
+          "agent": "tester",
+          "action": "Write unit and integration tests (90% coverage for critical paths)"
+        },
+        {
+          "agent": "reviewer",
+          "action": "Review code quality and adherence to AGENTS.md"
+        },
+        {
+          "agent": "qa-engineer",
+          "action": "Verify CI/CD pipeline and pre-commit hooks"
+        }
+      ],
+      "consensus": "weighted",
+      "model": "sonnet",
+      "max_agents": 6
+    },
+    "refactor-module": {
+      "description": "Refactor existing code for better quality",
+      "topology": "hierarchical",
+      "agents": ["architect", "coder", "tester", "reviewer"],
+      "steps": [
+        {
+          "agent": "architect",
+          "action": "Analyze current architecture and identify improvements"
+        },
+        {
+          "agent": "coder",
+          "action": "Refactor while maintaining backward compatibility"
+        },
+        {
+          "agent": "tester",
+          "action": "Ensure all existing tests pass + add new coverage"
+        },
+        {
+          "agent": "reviewer",
+          "action": "Verify refactoring maintains SOLID principles"
+        }
+      ],
+      "model": "sonnet",
+      "max_agents": 5
+    },
+    "security-audit": {
+      "description": "Security review and vulnerability assessment",
+      "topology": "flat",
+      "agents": ["security-architect", "auditor", "reviewer"],
+      "steps": [
+        {
+          "agent": "security-architect",
+          "action": "Review subprocess execution and input validation"
+        },
+        {
+          "agent": "auditor",
+          "action": "Scan for OWASP top 10 vulnerabilities"
+        },
+        {
+          "agent": "reviewer",
+          "action": "Verify no secrets/PII in logs"
+        }
+      ],
+      "model": "opus",
+      "max_agents": 3,
+      "consensus": "byzantine"
+    }
+  }
+}

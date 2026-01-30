@@ -63,6 +63,37 @@ spec-workflow-run --project /path/to/repo --spec my-spec --provider claude
 Both commands expect to find a `config.json` in the working directory unless a different
 `--config` path is provided.
 
+## Claude-Flow MCP Server
+
+This project is configured to use claude-flow's MCP server, providing Claude with 60+ specialized agents and workflow orchestration.
+
+### Setup
+
+```bash
+# Add claude-flow MCP server
+claude mcp add claude-flow -- npx claude-flow@v3alpha mcp start
+
+# Verify
+claude mcp list
+```
+
+### Available Tools
+
+Claude can use these tools when working on the project:
+- Swarm coordination (init, spawn, orchestrate)
+- Agent management (list, assign, metrics)
+- Workflow execution (predefined workflows for common tasks)
+- Memory and learning (pattern storage, vector search)
+
+See `AGENTS.md` for detailed usage and workflow definitions.
+
+### Configuration
+
+- **Agents**: `.claude-flow/agents.json`
+- **Domains**: `.claude-flow/domains.json`
+- **Workflows**: `.claude-flow/workflows.json`
+- **Project MCP**: `.mcp.json`
+
 ## TUI Mode
 
 The `spec-workflow-tui` command provides an interactive terminal UI for managing and monitoring multiple spec workflows simultaneously.

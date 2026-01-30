@@ -1,0 +1,78 @@
+{
+  "agents": {
+    "coordinator": {
+      "role": "Project coordinator and task orchestrator",
+      "specialization": "Task decomposition, dependency analysis",
+      "model": "sonnet",
+      "domains": ["core", "task-management"]
+    },
+    "architect": {
+      "role": "Software architect and system designer",
+      "specialization": "SOLID principles, DI, clean architecture",
+      "model": "sonnet",
+      "domains": ["core"],
+      "context": [
+        "AGENTS.md",
+        "CLAUDE.md"
+      ]
+    },
+    "coder": {
+      "role": "Python developer",
+      "specialization": "Python 3.11+, pytest, type hints",
+      "model": "sonnet",
+      "domains": ["core", "tui", "task-management"],
+      "constraints": [
+        "Max 500 LOC per file",
+        "Max 50 LOC per function",
+        "Frozen dataclasses for immutability"
+      ]
+    },
+    "tester": {
+      "role": "QA engineer and test automation specialist",
+      "specialization": "pytest, coverage, integration tests",
+      "model": "haiku",
+      "domains": ["testing", "task-management", "tui"],
+      "targets": [
+        "80% overall coverage",
+        "90% critical path coverage"
+      ]
+    },
+    "reviewer": {
+      "role": "Code reviewer and quality gatekeeper",
+      "specialization": "Code quality, SOLID, security",
+      "model": "sonnet",
+      "domains": ["core", "task-management"],
+      "tools": ["ruff", "black", "mypy"]
+    },
+    "ui-specialist": {
+      "role": "Terminal UI developer",
+      "specialization": "Rich library, TUI patterns, keybindings",
+      "model": "sonnet",
+      "domains": ["tui"]
+    },
+    "validator": {
+      "role": "Data validation and format expert",
+      "specialization": "Regex, parsing, validation rules",
+      "model": "haiku",
+      "domains": ["task-management"]
+    },
+    "security-architect": {
+      "role": "Security and permissions expert",
+      "specialization": "Subprocess security, input validation",
+      "model": "opus",
+      "domains": ["security"]
+    },
+    "qa-engineer": {
+      "role": "Quality assurance and CI/CD expert",
+      "specialization": "GitHub Actions, pre-commit, coverage",
+      "model": "haiku",
+      "domains": ["testing"]
+    },
+    "auditor": {
+      "role": "Security auditor",
+      "specialization": "Vulnerability scanning, OWASP",
+      "model": "opus",
+      "domains": ["security"]
+    }
+  }
+}

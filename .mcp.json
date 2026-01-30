@@ -1,0 +1,10 @@
+{
+  "claude-flow": {
+    "command": "npx",
+    "args": ["claude-flow@v3alpha", "mcp", "start"],
+    "env": {
+      "CLAUDE_FLOW_PROJECT": "spec-workflow-runner",
+      "CLAUDE_FLOW_CONFIG_DIR": ".claude-flow"
+    }
+  }
+}

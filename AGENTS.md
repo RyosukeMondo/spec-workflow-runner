@@ -40,3 +40,66 @@ Aim for ≥80 % coverage overall (≥90 % on critical paths) and keep each P
 - Keep Rich UI or other heavy deps encapsulated; utilities in `spec_workflow_runner.utils` remain UI-agnostic for reuse.
 
 Stick to this playbook and future agents will have a smooth, high-signal runway.
+
+## Claude-Flow MCP Integration
+
+This project uses claude-flow MCP server to provide Claude with specialized agents and workflow orchestration capabilities.
+
+### Available MCP Tools
+
+When working on this project, Claude has access to these claude-flow tools:
+
+**Swarm Coordination:**
+- `swarm_init`: Initialize agent swarms with topology selection
+- `agent_spawn`: Spawn specialized agents for specific tasks
+- `task_orchestrate`: Coordinate multi-agent task execution
+- `swarm_status`: Monitor swarm progress and agent states
+
+**Agent Management:**
+- `agent_list`: List available agents and their capabilities
+- `agent_metrics`: View agent performance and success rates
+- `agent_assign`: Assign tasks to specific agents
+
+**Memory & Learning:**
+- `vector_search`: Search project patterns and knowledge base
+- `pattern_store`: Store reusable patterns for future tasks
+- `reasoning_bank_query`: Retrieve past decisions and rationale
+
+**Workflow Execution:**
+- `workflow_start`: Start predefined workflows (implement-spec-task, fix-bug, etc.)
+- `workflow_status`: Check workflow progress
+- `workflow_checkpoint`: Save workflow state for resumption
+
+### Configured Workflows
+
+1. **implement-spec-task**: Full task implementation with architecture → coding → testing → review
+2. **fix-bug**: Quick bug fix with root cause analysis and regression testing
+3. **create-new-feature**: Feature development with full quality gates
+4. **refactor-module**: Code refactoring with backward compatibility checks
+5. **security-audit**: Security review with OWASP compliance
+
+### Agent Profiles
+
+See `.claude-flow/agents.json` for detailed agent specializations and constraints.
+
+### Usage in Claude
+
+```
+Claude, use the swarm_init tool to initialize a hierarchical swarm
+for implementing the next task in .spec-workflow/specs/task-auto-fix/tasks.md.
+Use the implement-spec-task workflow with the coordinator, architect,
+coder, tester, and reviewer agents.
+```
+
+### Setup for New Team Members
+
+```bash
+# Add claude-flow MCP server
+claude mcp add claude-flow -- npx claude-flow@v3alpha mcp start
+
+# Verify setup
+claude mcp list
+
+# Start working (MCP server auto-starts)
+claude
+```
