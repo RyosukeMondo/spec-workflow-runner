@@ -46,6 +46,15 @@ from .utils import (
 logger = logging.getLogger(__name__)
 
 
+def safe_print(text: str, **kwargs) -> None:
+    """Print text safely, handling Unicode encoding errors on Windows."""
+    try:
+        print(text, **kwargs)
+    except UnicodeEncodeError:
+        # Replace problematic characters with ASCII equivalents
+        print(text.encode('ascii', errors='replace').decode('ascii'), **kwargs)
+
+
 class AllSpecsSentinel:
     """Marker object representing the 'run all specs' selection."""
 
@@ -1472,11 +1481,11 @@ def run_loop(
         remaining = stats.total - stats.done
 
         # Display enhanced progress information
-        print(f"\n{'=' * 80}")
-        print(f"SPEC: {spec_name}")
-        print(f"{'=' * 80}")
-        print(f"Progress: {stats.summary()}")
-        print(f"{stats.progress_bar()}")
+        safe_print(f"\n{'=' * 80}")
+        safe_print(f"SPEC: {spec_name}")
+        safe_print(f"{'=' * 80}")
+        safe_print(f"Progress: {stats.summary()}")
+        safe_print(f"{stats.progress_bar()}")
 
         # Show next pending tasks
         task_details = read_task_details(tasks_path)
@@ -1484,16 +1493,16 @@ def run_loop(
         in_progress_tasks = [t for t in task_details if t.status == "in_progress"]
 
         if in_progress_tasks:
-            print(f"\nIn Progress:")
+            safe_print(f"\nIn Progress:")
             for task in in_progress_tasks[:3]:  # Show up to 3
-                print(f"  - {task.task_id}: {task.title[:60]}")
+                safe_print(f"  - {task.task_id}: {task.title[:60]}")
 
         if pending_tasks:
-            print(f"\nNext Pending Tasks:")
+            safe_print(f"\nNext Pending Tasks:")
             for task in pending_tasks[:3]:  # Show up to 3
-                print(f"  - {task.task_id}: {task.title[:60]}")
+                safe_print(f"  - {task.task_id}: {task.title[:60]}")
 
-        print(f"{'=' * 80}\n")
+        safe_print(f"{'=' * 80}\n")
 
         if remaining <= 0:
             print("[OK] All tasks complete. Nothing more to run.")
