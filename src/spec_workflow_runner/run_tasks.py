@@ -550,12 +550,11 @@ def _execute_provider_command(
         display_interval = 5  # Check for updates every 5 seconds
         last_timeout_check = time.time()
 
-        try:
-            while returncode is None:
-                try:
-                    # Check process status with short timeout for responsive display
-                    returncode = proc.wait(timeout=display_interval)
-                except subprocess.TimeoutExpired:
+        while returncode is None:
+            try:
+                # Check process status with short timeout for responsive display
+                returncode = proc.wait(timeout=display_interval)
+            except subprocess.TimeoutExpired:
                     # Process hasn't finished yet - check for file modifications
                     current_time = time.time()
                     current_mtime = _get_latest_file_mtime(project_path, ignore_dirs)
