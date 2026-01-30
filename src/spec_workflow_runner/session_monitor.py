@@ -27,7 +27,8 @@ def get_claude_sessions_dir(project_path: Path) -> Path:
 
     # Replace drive letter colon and all separators with dashes
     # Example: C:\Users\ryosu\repos\keyrx -> C--Users-ryosu-repos-keyrx
-    normalized = path_str.replace(":", "").replace("\\", "-").replace("/", "-")
+    # Pattern: ":" becomes "-" and "\" becomes "-", so "C:\" becomes "C--"
+    normalized = path_str.replace(":", "-").replace("\\", "-").replace("/", "-")
 
     claude_dir = Path.home() / ".claude" / "projects" / normalized
     return claude_dir
