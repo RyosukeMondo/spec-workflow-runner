@@ -475,6 +475,13 @@ def _execute_provider_command(
     import threading
 
     formatted_command = format_command_string(command)
+
+    # Save command to file for debugging
+    import tempfile
+    cmd_file = Path(tempfile.gettempdir()) / "last_command.txt"
+    cmd_file.write_text(formatted_command, encoding="utf-8")
+    print(f"\n[DEBUG] Command saved to: {cmd_file}")
+
     print("\nRunning:", formatted_command)
     if activity_timeout_seconds:
         print(f"Activity timeout: {activity_timeout_seconds}s ({activity_timeout_seconds // 60} minutes of inactivity)")
