@@ -726,7 +726,7 @@ def _execute_provider_command(
                 elif msg_type == "result":
                     # Show final result
                     if "result" in data:
-                        print(f"\n[Result: {data['result'][:100]}...]", flush=True)
+                        safe_print(f"\n[Result: {data['result'][:100]}...]")
 
                 elif msg_type == "tool_result":
                     # Check if this is a result from a Task tool
