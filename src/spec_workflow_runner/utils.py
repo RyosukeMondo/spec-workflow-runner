@@ -666,9 +666,26 @@ TASK_PATTERN = re.compile(
     re.MULTILINE | re.IGNORECASE,
 )
 
+# Pattern for alternate heading format: ### TASK-ID: Title
+HEADING_TASK_PATTERN = re.compile(
+    r"^###\s+([A-Z]+-\d+):",
+    re.MULTILINE,
+)
+
+# Pattern for **Status**: field
+STATUS_FIELD_PATTERN = re.compile(
+    r"\*\*Status\*\*:\s*(\w+(?:\s+\w+)*)",
+    re.IGNORECASE,
+)
+
 
 def read_task_stats(tasks_path: Path) -> TaskStats:
-    """Parse task status counts from tasks.md."""
+    """Parse task status counts from tasks.md.
+
+    Supports two formats:
+    1. Checkbox format: - [ ] 1. Task title
+    2. Heading format: ### TASK-ID: Title with **Status**: field
+    """
     text = tasks_path.read_text(encoding="utf-8")
 
     # Only count tasks in the "## Tasks" section
@@ -687,7 +704,10 @@ def read_task_stats(tasks_path: Path) -> TaskStats:
             task_text = text[tasks_section_start:next_section]
 
     pending = done = in_progress = 0
-    for match in TASK_PATTERN.finditer(task_text):
+
+    # Count checkbox format tasks
+    checkbox_matches = list(TASK_PATTERN.finditer(task_text))
+    for match in checkbox_matches:
         state = match.group("state").lower()
         if state == "x":
             done += 1
@@ -695,6 +715,36 @@ def read_task_stats(tasks_path: Path) -> TaskStats:
             in_progress += 1
         else:
             pending += 1
+
+    # If no checkbox tasks found, try alternate heading format
+    if not checkbox_matches:
+        # Find all ### TASK-ID: headings
+        heading_matches = list(HEADING_TASK_PATTERN.finditer(task_text))
+
+        for i, heading_match in enumerate(heading_matches):
+            # Extract the section for this task (from heading to next heading or end)
+            start_pos = heading_match.start()
+            if i + 1 < len(heading_matches):
+                end_pos = heading_matches[i + 1].start()
+            else:
+                end_pos = len(task_text)
+
+            task_section = task_text[start_pos:end_pos]
+
+            # Look for **Status**: field in this section
+            status_match = STATUS_FIELD_PATTERN.search(task_section)
+            if status_match:
+                status = status_match.group(1).lower().strip()
+                if status == "completed":
+                    done += 1
+                elif status == "in progress":
+                    in_progress += 1
+                else:  # pending or any other value
+                    pending += 1
+            else:
+                # No status field, assume pending
+                pending += 1
+
     return TaskStats(done=done, pending=pending, in_progress=in_progress)
 
 
