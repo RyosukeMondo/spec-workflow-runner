@@ -377,8 +377,9 @@ def mark_task_status(tasks_file: Path, task_id: str, new_status: str) -> bool:
 
     Args:
         tasks_file: Path to tasks.md
-        task_id: Task ID (e.g., "1", "4.2")
+        task_id: Task ID (e.g., "1", "4.2" for checkbox format, or "MEM-001" for heading format)
         new_status: New status: " " (pending), "-" (in-progress), "x" (completed)
+                    OR "Pending", "In Progress", "Completed" for heading format
 
     Returns:
         True if task was found and updated, False otherwise
@@ -387,25 +388,84 @@ def mark_task_status(tasks_file: Path, task_id: str, new_status: str) -> bool:
         return False
 
     content = tasks_file.read_text(encoding="utf-8")
-    lines = content.splitlines()
-
-    # Pattern to match task line
     import re
-    task_pattern = re.compile(rf"^(-\s+\[)[ x\-](\]\s+{re.escape(task_id)}\.\s+.+)$")
 
-    updated = False
-    for i, line in enumerate(lines):
-        match = task_pattern.match(line)
-        if match:
-            # Replace status character
-            lines[i] = f"{match.group(1)}{new_status}{match.group(2)}"
-            updated = True
-            break
+    # Try checkbox format first: - [ ] 1. Task title
+    task_pattern = re.compile(rf"^(-\s+\[)[ x\-](\]\s+{re.escape(task_id)}\.\s+.+)$", re.MULTILINE)
+    match = task_pattern.search(content)
 
-    if updated:
-        tasks_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    if match:
+        # Checkbox format
+        new_line = f"{match.group(1)}{new_status}{match.group(2)}"
+        content = task_pattern.sub(new_line, content, count=1)
+        tasks_file.write_text(content, encoding="utf-8")
+        return True
 
-    return updated
+    # Try heading format: ### MEM-001: Title ... **Status**: Pending
+    status_map = {" ": "Pending", "-": "In Progress", "x": "Completed"}
+    status_word = status_map.get(new_status, new_status)
+
+    heading_pattern = re.compile(rf"^### {re.escape(task_id)}:.+?(\*\*Status\*\*:\s*)\w+", re.MULTILINE | re.DOTALL)
+    match = heading_pattern.search(content)
+
+    if match:
+        # Heading format - replace **Status**: Old with **Status**: New
+        old_status_pattern = re.compile(rf"(\*\*Status\*\*:\s*)\w+")
+        # Find the status line after the heading
+        task_start = content.find(f"### {task_id}:")
+        task_section = content[task_start:task_start+500]  # Look in next 500 chars
+        status_match = old_status_pattern.search(task_section)
+
+        if status_match:
+            old_text = status_match.group(0)
+            new_text = f"{status_match.group(1)}{status_word}"
+            content = content.replace(old_text, new_text, 1)
+            tasks_file.write_text(content, encoding="utf-8")
+            return True
+
+    return False
+
+
+def parse_tasks_alternate_format(tasks_file: Path) -> list[dict]:
+    """Parse tasks.md with ### heading format and **Status** field.
+
+    Returns list of task dicts with: id, title, status, content
+    """
+    import re
+
+    if not tasks_file.exists():
+        return []
+
+    content = tasks_file.read_text(encoding="utf-8")
+    tasks = []
+
+    # Find all ### Task headings
+    task_pattern = re.compile(r'^### ([A-Z]+-\d+): (.+)$', re.MULTILINE)
+    status_pattern = re.compile(r'\*\*Status\*\*:\s*(\w+)', re.IGNORECASE)
+
+    matches = list(task_pattern.finditer(content))
+
+    for i, match in enumerate(matches):
+        task_id = match.group(1)
+        task_title = match.group(2)
+        start_pos = match.end()
+
+        # Find end of this task (next ### or end of file)
+        end_pos = matches[i + 1].start() if i + 1 < len(matches) else len(content)
+        task_content = content[start_pos:end_pos]
+
+        # Extract status
+        status_match = status_pattern.search(task_content)
+        status = status_match.group(1).lower() if status_match else "pending"
+
+        tasks.append({
+            "id": task_id,
+            "title": task_title,
+            "status": status,
+            "content": task_content.strip()
+        })
+
+    return tasks
 
 
 def build_prompt(cfg: Config, spec_name: str, spec_path: Path, stats: TaskStats) -> str:
@@ -417,10 +477,30 @@ def build_prompt(cfg: Config, spec_name: str, spec_path: Path, stats: TaskStats)
 
     # Parse tasks.md to find first pending task
     tasks_file = spec_path / cfg.tasks_filename
-    tasks, warnings = parse_tasks_file(tasks_file)
 
-    # Find first pending task
+    # Try standard format first
+    tasks, warnings = parse_tasks_file(tasks_file)
     pending_task = next((t for t in tasks if t.status == TaskStatus.PENDING), None)
+
+    # If no tasks found, try alternate format (### headings with **Status**)
+    if not pending_task:
+        alt_tasks = parse_tasks_alternate_format(tasks_file)
+        alt_pending = next((t for t in alt_tasks if t["status"] == "pending"), None)
+
+        if alt_pending:
+            # Convert to Task-like structure
+            from dataclasses import dataclass
+            @dataclass
+            class AltTask:
+                id: str
+                title: str
+                description: list[str]
+
+            pending_task = AltTask(
+                id=alt_pending["id"],
+                title=alt_pending["title"],
+                description=[alt_pending["content"]]
+            )
 
     if not pending_task:
         # No pending tasks - return a simple message
@@ -1231,6 +1311,15 @@ def run_loop(
         tasks_file = spec_path / cfg.tasks_filename
         tasks, _ = parse_tasks_file(tasks_file)
         pending_task = next((t for t in tasks if t.status == TaskStatus.PENDING), None)
+
+        # Try alternate format if standard format has no pending tasks
+        if not pending_task:
+            alt_tasks = parse_tasks_alternate_format(tasks_file)
+            alt_pending = next((t for t in alt_tasks if t["status"] == "pending"), None)
+            if alt_pending:
+                # Use a simple dict to store task info
+                pending_task = type('obj', (object,), {'id': alt_pending["id"]})()
+
         if pending_task:
             mark_task_status(tasks_file, pending_task.id, "-")
             print(f"Marked task {pending_task.id} as in-progress")
