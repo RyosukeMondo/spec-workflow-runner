@@ -499,8 +499,14 @@ def _execute_provider_command(
 
         line_count = 0
         while True:
+            import sys
+            print(f"[DEBUG] About to call readline() - line {line_count + 1}", file=sys.stderr, flush=True)
+            sys.stderr.flush()
             line = proc.stdout.readline()
+            print(f"[DEBUG] readline() returned, length: {len(line) if line else 0}", file=sys.stderr, flush=True)
+            sys.stderr.flush()
             if not line:  # Empty bytes means EOF
+                print("[DEBUG] Got empty line, breaking", file=sys.stderr, flush=True)
                 break
             print(f"[DEBUG] Got line {line_count + 1}, length: {len(line)}", flush=True)
             decoded = line.decode("utf-8", errors="replace").strip()
