@@ -19,7 +19,16 @@ def get_claude_sessions_dir(project_path: Path) -> Path:
         Path to Claude sessions directory for this project
     """
     # Convert project path to Claude's format: C:\Users\... -> C--Users-...
-    normalized = str(project_path).replace(":", "").replace("\\", "-").replace("/", "-")
+    # Use resolve() to get absolute path and normalize it
+    abs_path = project_path.resolve()
+
+    # Convert to string and normalize separators
+    path_str = str(abs_path)
+
+    # Replace drive letter colon and all separators with dashes
+    # Example: C:\Users\ryosu\repos\keyrx -> C--Users-ryosu-repos-keyrx
+    normalized = path_str.replace(":", "").replace("\\", "-").replace("/", "-")
+
     claude_dir = Path.home() / ".claude" / "projects" / normalized
     return claude_dir
 
@@ -124,13 +133,27 @@ class SessionMonitor:
         self.last_activity_time = time.time()
         self.last_file_size = 0
 
-    def start(self) -> bool:
+    def start(self, wait_seconds: int = 10) -> bool:
         """Start monitoring the latest session file.
+
+        Args:
+            wait_seconds: Seconds to wait for session file to be created
 
         Returns:
             True if session file found and opened, False otherwise
         """
-        self.session_file = get_latest_session_file(self.sessions_dir)
+        # Wait for session file to be created (Claude creates it after starting)
+        start_time = time.time()
+        while time.time() - start_time < wait_seconds:
+            self.session_file = get_latest_session_file(self.sessions_dir)
+
+            if self.session_file:
+                # Check if file was created recently (within last 30 seconds)
+                file_age = time.time() - self.session_file.stat().st_mtime
+                if file_age < 30:
+                    break
+
+            time.sleep(0.5)
 
         if not self.session_file:
             return False

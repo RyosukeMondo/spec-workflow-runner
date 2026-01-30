@@ -538,12 +538,16 @@ def _execute_provider_command(
 
         # Start session monitor for real-time activity tracking
         session_monitor = SessionMonitor(project_path)
-        session_started = session_monitor.start()
+        print(f"📊 Starting session monitor (waiting for Claude to create session file)...")
+
+        session_started = session_monitor.start(wait_seconds=10)
 
         if session_started:
-            print(f"📊 Monitoring Claude session activity in real-time...")
+            print(f"✓ Session monitoring active - showing real-time Claude activity")
         else:
-            print(f"⚠️  Session monitoring unavailable, falling back to file-based detection")
+            sessions_dir = session_monitor.sessions_dir
+            print(f"⚠️  Session file not found at: {sessions_dir}")
+            print(f"   Falling back to file-based activity detection")
 
         # Wait for process with activity-based timeout monitoring
         returncode = None
