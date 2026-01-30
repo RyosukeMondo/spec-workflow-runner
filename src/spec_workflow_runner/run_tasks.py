@@ -509,18 +509,39 @@ def _execute_provider_command(
             # Parse and display stream-json format
             try:
                 data = json.loads(decoded)
-                if "message" in data and "content" in data["message"]:
-                    content = data["message"]["content"]
-                    if isinstance(content, list):
-                        for item in content:
-                            if item.get("type") == "text":
-                                print(item.get("text", ""), flush=True)
-                            elif item.get("type") == "tool_use":
-                                tool_name = item.get("name", "unknown")
-                                print(f"[Using tool: {tool_name}]", flush=True)
-                            elif item.get("type") == "thinking":
-                                thinking = item.get("thinking", "")[:150]
-                                print(f"[Thinking: {thinking}...]", flush=True)
+                msg_type = data.get("type")
+
+                # Handle different message types
+                if msg_type == "system":
+                    # Show MCP server connection status
+                    if "mcp_servers" in data:
+                        for server in data["mcp_servers"]:
+                            status = server.get("status", "unknown")
+                            name = server.get("name", "unknown")
+                            print(f"[MCP: {name} - {status}]", flush=True)
+
+                elif msg_type == "assistant":
+                    # Display assistant message content
+                    if "message" in data and "content" in data["message"]:
+                        content = data["message"]["content"]
+                        if isinstance(content, list):
+                            for item in content:
+                                if item.get("type") == "text":
+                                    print(item.get("text", ""), flush=True)
+                                elif item.get("type") == "tool_use":
+                                    tool_name = item.get("name", "unknown")
+                                    print(f"[Using tool: {tool_name}]", flush=True)
+                                elif item.get("type") == "thinking":
+                                    thinking = item.get("thinking", "")[:150]
+                                    print(f"[Thinking: {thinking}...]", flush=True)
+
+                elif msg_type == "result":
+                    # Show final result
+                    if "result" in data:
+                        print(f"\n[Result: {data['result'][:100]}...]", flush=True)
+
+                # If message type not handled, silently skip (don't spam console)
+
             except (json.JSONDecodeError, KeyError, TypeError):
                 # If not valid JSON, just print the line
                 print(decoded, flush=True)
