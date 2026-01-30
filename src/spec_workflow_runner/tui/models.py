@@ -80,6 +80,9 @@ class RunnerState:
     last_commit_hash: str | None = None
     last_commit_message: str | None = None
     exit_code: int | None = None
+    retry_count: int = 0
+    max_retries: int = 0
+    last_retry_at: datetime | None = None
 
     def to_dict(self) -> dict[str, Any]:
         """Serialize runner state to JSON-compatible dict."""
@@ -96,11 +99,15 @@ class RunnerState:
             "last_commit_hash": self.last_commit_hash,
             "last_commit_message": self.last_commit_message,
             "exit_code": self.exit_code,
+            "retry_count": self.retry_count,
+            "max_retries": self.max_retries,
+            "last_retry_at": self.last_retry_at.isoformat() if self.last_retry_at else None,
         }
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> RunnerState:
         """Deserialize runner state from JSON-compatible dict."""
+        last_retry_at_str = data.get("last_retry_at")
         return cls(
             runner_id=str(data["runner_id"]),
             project_path=Path(data["project_path"]),
@@ -114,6 +121,9 @@ class RunnerState:
             last_commit_hash=data.get("last_commit_hash"),
             last_commit_message=data.get("last_commit_message"),
             exit_code=data.get("exit_code"),
+            retry_count=int(data.get("retry_count", 0)),
+            max_retries=int(data.get("max_retries", 0)),
+            last_retry_at=datetime.fromisoformat(last_retry_at_str) if last_retry_at_str else None,
         )
 
     def __repr__(self) -> str:

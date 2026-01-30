@@ -196,7 +196,7 @@ class RunnerManager:
             text_mode=True,
         )
 
-        # Create runner state
+        # Create runner state with retry settings
         runner_id = str(uuid.uuid4())
         runner = RunnerState(
             runner_id=runner_id,
@@ -208,6 +208,8 @@ class RunnerManager:
             status=RunnerStatus.RUNNING,
             started_at=datetime.now(),
             baseline_commit=baseline_commit,
+            retry_count=0,
+            max_retries=self.config.retry_config.max_retries if self.config.retry_config.retry_on_crash else 0,
         )
 
         # Store runner, process, and log file
@@ -444,6 +446,154 @@ class RunnerManager:
         except subprocess.CalledProcessError as err:
             logger.error(f"Failed to detect commits for runner {runner_id}: {err}")
             return None, None
+
+    def maybe_retry_runner(
+        self,
+        runner_id: str,
+        provider: Provider,
+        model: str,
+    ) -> bool:
+        """Attempt to retry a crashed runner if retry is enabled and not exceeded.
+
+        Args:
+            runner_id: ID of runner to retry
+            provider: Provider instance to use for retry
+            model: Model identifier to use
+
+        Returns:
+            True if retry was attempted, False otherwise
+        """
+        runner = self.runners.get(runner_id)
+        if not runner:
+            logger.warning(f"Cannot retry runner {runner_id}: not found")
+            return False
+
+        # Only retry crashed runners
+        if runner.status != RunnerStatus.CRASHED:
+            logger.debug(f"Runner {runner_id} not in CRASHED state, skipping retry")
+            return False
+
+        # Check if retry is enabled
+        if not self.config.retry_config.retry_on_crash:
+            logger.debug("Retry disabled in config, skipping retry")
+            return False
+
+        # Check if max retries exceeded
+        if runner.retry_count >= runner.max_retries:
+            logger.info(
+                f"Max retries ({runner.max_retries}) reached for runner {runner_id}, "
+                f"not retrying"
+            )
+            return False
+
+        # Calculate backoff delay
+        backoff_seconds = self.config.retry_config.retry_backoff_seconds * (
+            self.config.retry_config.backoff_multiplier ** runner.retry_count
+        )
+        backoff_seconds = min(
+            backoff_seconds,
+            self.config.retry_config.max_backoff_seconds,
+        )
+
+        logger.info(
+            f"Retrying runner {runner_id} (attempt {runner.retry_count + 1}/{runner.max_retries}) "
+            f"after {backoff_seconds:.1f}s backoff..."
+        )
+
+        # Apply backoff delay
+        time.sleep(backoff_seconds)
+
+        # Close old log file if still open
+        old_log_file = self.log_files.get(runner_id)
+        if old_log_file:
+            try:
+                old_log_file.close()
+            except Exception as e:
+                logger.warning(f"Error closing old log file: {e}")
+            del self.log_files[runner_id]
+
+        # Remove old process handle
+        if runner_id in self.processes:
+            del self.processes[runner_id]
+
+        # Start new subprocess with same parameters
+        try:
+            # Get current task stats for prompt context
+            from ..utils import read_task_stats
+
+            stats = read_task_stats(runner.project_path, runner.spec_name, self.config)
+
+            # Build prompt
+            context = {
+                "spec_name": runner.spec_name,
+                "tasks_total": stats.total,
+                "tasks_done": stats.done,
+                "tasks_remaining": stats.total - stats.done,
+                "tasks_in_progress": stats.in_progress,
+                "timestamp": datetime.now().isoformat(),
+            }
+
+            prompt = self.config.prompt_template.format(**context)
+            provider_cmd = provider.build_command(
+                prompt=prompt,
+                project_path=runner.project_path,
+                config_overrides=self.config.codex_config_overrides,
+            )
+
+            # Prepare log file for retry
+            log_dir = (
+                runner.project_path
+                / self.config.spec_workflow_dir_name
+                / self.config.log_dir_name
+            )
+            timestamp = time.strftime("%Y%m%d_%H%M%S")
+            log_filename = self.config.log_file_template.format(
+                index=runner.retry_count + 2,  # retry number (1-indexed + 1 for base)
+                spec_name=runner.spec_name,
+                timestamp=timestamp,
+            )
+            log_path = log_dir / log_filename
+
+            # Start new process
+            log_file = log_path.open("w", encoding="utf-8", buffering=1)
+            process = popen_command(
+                provider_cmd.to_list(),
+                cwd=runner.project_path,
+                stdout=log_file,
+                clean_claude_env=True,
+                text_mode=True,
+            )
+
+            # Update runner state
+            updated_runner = replace(
+                runner,
+                pid=process.pid,
+                status=RunnerStatus.RUNNING,
+                retry_count=runner.retry_count + 1,
+                last_retry_at=datetime.now(),
+                exit_code=None,
+            )
+
+            self.runners[runner_id] = updated_runner
+            self.processes[runner_id] = process
+            self.log_files[runner_id] = log_file
+
+            # Persist state
+            self._persist_state()
+
+            logger.info(
+                f"Successfully restarted runner {runner_id} "
+                f"(PID: {process.pid}, retry: {updated_runner.retry_count}/{runner.max_retries})"
+            )
+
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to retry runner {runner_id}: {e}")
+            import traceback
+
+            traceback.print_exc()
+            return False
 
     def shutdown(self, stop_all: bool = True, timeout: int = 10) -> None:
         """Shutdown all runners gracefully.
