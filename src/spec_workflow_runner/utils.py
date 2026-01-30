@@ -12,6 +12,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, TypeVar
 
+from .retry_handler import RetryConfig
 from .subprocess_helpers import run_command
 
 if TYPE_CHECKING:
@@ -423,6 +424,7 @@ class Config:
     activity_check_interval_seconds: int = 300
     mcp_server_name: str = "spec-workflow"
     mcp_package: str = "npx @pimzino/spec-workflow-mcp@latest"
+    retry_config: RetryConfig = RetryConfig()
 
     @classmethod
     def from_dict(cls, payload: dict) -> Config:
@@ -486,6 +488,17 @@ class Config:
             payload.get("mcp_package", "npx @pimzino/spec-workflow-mcp@latest"),
         )
 
+        # Load retry configuration
+        retry_config = RetryConfig(
+            max_retries=int(payload.get("retry_max_retries", 3)),
+            retry_backoff_seconds=int(payload.get("retry_backoff_seconds", 5)),
+            retry_on_crash=bool(payload.get("retry_on_crash", True)),
+            retry_log_dir=Path(payload.get("retry_log_dir", "logs/retries")),
+            activity_timeout_seconds=activity_timeout_seconds,
+            backoff_multiplier=float(payload.get("retry_backoff_multiplier", 2.0)),
+            max_backoff_seconds=int(payload.get("retry_max_backoff_seconds", 300)),
+        )
+
         return cls(
             repos_root=repos_root,
             spec_workflow_dir_name=payload["spec_workflow_dir_name"],
@@ -513,6 +526,7 @@ class Config:
             activity_check_interval_seconds=activity_check_interval_seconds,
             mcp_server_name=mcp_server_name,
             mcp_package=mcp_package,
+            retry_config=retry_config,
         )
 
 

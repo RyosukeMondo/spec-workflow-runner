@@ -21,5 +21,11 @@
   "codex_config_overrides": {
     "mcp_servers.spec-workflow.tool_timeout_sec": 60,
     "mcp_servers.spec-workflow.startup_timeout_sec": 60
-  }
+  },
+  "retry_max_retries": 3,
+  "retry_backoff_seconds": 5,
+  "retry_on_crash": true,
+  "retry_log_dir": "logs/retries",
+  "retry_backoff_multiplier": 2.0,
+  "retry_max_backoff_seconds": 300
 }
