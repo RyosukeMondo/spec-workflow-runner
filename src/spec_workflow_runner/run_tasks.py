@@ -14,6 +14,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import TextIO
 
+from .completion_verify import run_verification
+from .git_hooks import block_commits
 from .providers import ClaudeProvider, Provider, create_provider, get_supported_models
 from .subprocess_helpers import format_command_string, popen_command
 from .utils import (
@@ -45,6 +47,7 @@ from .utils import (
     reduce_spec_context,
     rotate_claude_account,
 )
+from .validation_check import run_validation
 
 logger = logging.getLogger(__name__)
 
@@ -1455,6 +1458,197 @@ def run_pre_session_validation(
         print(f"    Check {log_path} for details\n")
 
 
+def run_three_phase_iteration(
+    provider: Provider,
+    cfg: Config,
+    project_path: Path,
+    spec_name: str,
+    spec_path: Path,
+    iteration: int,
+    log_dir: Path,
+) -> tuple[bool, int]:
+    """Run a single 3-phase workflow iteration.
+
+    Args:
+        provider: Provider instance
+        cfg: Configuration
+        project_path: Path to project root
+        spec_name: Name of spec
+        spec_path: Path to spec directory
+        iteration: Current iteration number
+        log_dir: Directory for logs
+
+    Returns:
+        Tuple of (progress_made, agent_commits)
+    """
+    tasks_path = spec_path / cfg.tasks_filename
+
+    # ===================================================================
+    # PHASE 1: PRE-SESSION VALIDATION
+    # ===================================================================
+    print(f"\n{'='*80}")
+    print(f"PHASE 1: PRE-SESSION VALIDATION")
+    print(f"{'='*80}\n")
+
+    validation_log = log_dir / f"validation_{iteration}.log"
+    validation_log.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        validation_result = run_validation(
+            spec_name=spec_name,
+            spec_path=spec_path,
+            project_path=project_path,
+            tasks_filename=cfg.tasks_filename,
+        )
+
+        # Log validation results
+        with validation_log.open("w") as f:
+            f.write(f"Iteration {iteration} - Validation Results\n")
+            f.write(f"{'='*80}\n\n")
+            f.write(validation_result.summary() + "\n\n")
+
+            for val in validation_result.validations:
+                if not val.is_valid:
+                    f.write(f"Task: {val.task_id} - {val.title}\n")
+                    for issue in val.issues:
+                        f.write(f"  - {issue}\n")
+                    f.write("\n")
+
+        print(validation_result.summary())
+        if validation_result.tasks_reset > 0:
+            print(f"\n⚠️  {validation_result.tasks_reset} task(s) reset to in-progress")
+            print(f"   Check {validation_log} for details")
+
+    except Exception as e:
+        logger.warning(f"Validation check failed: {e}")
+        print(f"⚠️  Validation check failed: {e}")
+        print("   Continuing with implementation phase...")
+
+    # ===================================================================
+    # PHASE 2: IMPLEMENTATION SESSION
+    # ===================================================================
+    print(f"\n{'='*80}")
+    print(f"PHASE 2: IMPLEMENTATION SESSION")
+    print(f"{'='*80}\n")
+
+    # Get current stats
+    stats = read_task_stats(tasks_path)
+    progress_summary = f"{stats.done}/{stats.total} tasks complete ({stats.pending} pending, {stats.in_progress} in progress)"
+
+    # Use implementation prompt
+    prompt = cfg.implementation_prompt.format(
+        spec_name=spec_name,
+        progress_summary=progress_summary,
+    )
+
+    log_path = log_dir / cfg.log_file_template.format(index=iteration)
+
+    # Run implementation with commit blocking
+    agent_commits = 0
+    last_commit_before = get_current_commit(project_path)
+
+    try:
+        if cfg.block_commits_during_implementation:
+            print("🔒 Git commits blocked during implementation\n")
+            with block_commits(project_path):
+                agent_commits = run_provider(
+                    provider,
+                    cfg,
+                    project_path,
+                    prompt,
+                    False,  # not dry_run
+                    spec_name=spec_name,
+                    iteration=iteration,
+                    log_path=log_path,
+                )
+            print("\n🔓 Git commits allowed again\n")
+        else:
+            agent_commits = run_provider(
+                provider,
+                cfg,
+                project_path,
+                prompt,
+                False,  # not dry_run
+                spec_name=spec_name,
+                iteration=iteration,
+                log_path=log_path,
+            )
+    except Exception as e:
+        logger.error(f"Implementation session failed: {e}")
+        raise
+
+    # ===================================================================
+    # PHASE 3: POST-SESSION VERIFICATION
+    # ===================================================================
+    print(f"\n{'='*80}")
+    print(f"PHASE 3: POST-SESSION VERIFICATION")
+    print(f"{'='*80}\n")
+
+    verification_log = log_dir / f"verification_{iteration}.log"
+
+    try:
+        verification_result = run_verification(
+            spec_name=spec_name,
+            spec_path=spec_path,
+            project_path=project_path,
+            make_commits=True,
+            tasks_filename=cfg.tasks_filename,
+        )
+
+        # Log verification results
+        with verification_log.open("w") as f:
+            f.write(f"Iteration {iteration} - Verification Results\n")
+            f.write(f"{'='*80}\n\n")
+            f.write(verification_result.summary() + "\n\n")
+
+            completed = [v for v in verification_result.verifications if v.should_mark_complete]
+            incomplete = [v for v in verification_result.verifications if not v.should_mark_complete]
+
+            if completed:
+                f.write("✅ Verified and marked complete:\n\n")
+                for task in completed:
+                    f.write(f"  {task.task_id}: {task.title}\n")
+                    if task.files_modified:
+                        f.write(f"    Files: {', '.join(task.files_modified)}\n")
+                f.write("\n")
+
+            if incomplete:
+                f.write("⏸️  Still in progress:\n\n")
+                for task in incomplete:
+                    f.write(f"  {task.task_id}: {task.title}\n")
+                    for issue in task.issues:
+                        f.write(f"    - {issue}\n")
+                f.write("\n")
+
+            if verification_result.commits_made:
+                f.write(f"📝 Commits created:\n")
+                for sha in verification_result.commits_made:
+                    f.write(f"  {sha}\n")
+
+        print(verification_result.summary())
+        if verification_result.tasks_completed > 0:
+            print(f"✅ {verification_result.tasks_completed} task(s) verified and marked complete")
+        if verification_result.tasks_incomplete > 0:
+            print(f"⏸️  {verification_result.tasks_incomplete} task(s) still in progress")
+        if verification_result.commits_made:
+            print(f"📝 Created {len(verification_result.commits_made)} commit(s)")
+        print(f"   Check {verification_log} for details")
+
+    except Exception as e:
+        logger.warning(f"Verification failed: {e}")
+        print(f"⚠️  Verification failed: {e}")
+
+    # Determine if progress was made
+    last_commit_after = get_current_commit(project_path)
+    has_new_commit = last_commit_after != last_commit_before
+    has_agent_commits = agent_commits > 0
+    has_verified_work = verification_result.tasks_completed > 0 if 'verification_result' in locals() else False
+
+    progress_made = has_new_commit or has_agent_commits or has_verified_work
+
+    return progress_made, agent_commits
+
+
 def run_loop(
     provider: Provider,
     cfg: Config,
@@ -1480,10 +1674,7 @@ def run_loop(
     last_commit = get_current_commit(project_path)
 
     while True:
-        # Run pre-session validation before each iteration to sync tasks.md with codebase
-        if cfg.enable_pre_session_validation:
-            run_pre_session_validation(provider, cfg, project_path, spec_name, spec_path)
-
+        # === Check completion status ===
         stats = read_task_stats(tasks_path)
         remaining = stats.total - stats.done
 
@@ -1517,51 +1708,93 @@ def run_loop(
 
         iteration += 1
 
-        # Build prompt with progress summary (no specific task assignment)
-        progress_summary = f"{stats.done}/{stats.total} tasks complete ({stats.pending} pending, {stats.in_progress} in progress)"
-        prompt = cfg.prompt_template.format(
-            spec_name=spec_name,
-            progress_summary=progress_summary
-        )
+        # === Run iteration based on workflow mode ===
+        if cfg.enable_three_phase_workflow:
+            # 3-PHASE WORKFLOW
+            print(f"\n[Iteration {iteration}] Running 3-phase workflow (validate → implement → verify)...")
 
-        log_path = log_dir / cfg.log_file_template.format(index=iteration)
-        print(f"\n[Iteration {iteration}] Letting Claude choose what to work on...")
+            try:
+                progress_made, agent_commits = run_three_phase_iteration(
+                    provider=provider,
+                    cfg=cfg,
+                    project_path=project_path,
+                    spec_name=spec_name,
+                    spec_path=spec_path,
+                    iteration=iteration,
+                    log_dir=log_dir,
+                )
 
-        agent_commits = run_provider(
-            provider,
-            cfg,
-            project_path,
-            prompt,
-            dry_run,
-            spec_name=spec_name,
-            iteration=iteration,
-            log_path=log_path,
-        )
+                if progress_made:
+                    print(f"\n[OK] Progress made in 3-phase workflow")
+                    no_commit_streak = 0
+                else:
+                    print(f"\n[!]  No verified progress this iteration")
+                    no_commit_streak += 1
+                    print(f"     Circuit breaker streak: {no_commit_streak}/{cfg.no_commit_limit}")
 
-        new_last_commit, no_commit_streak = _check_commit_progress(
-            project_path, last_commit, no_commit_streak, cfg
-        )
+                    if no_commit_streak >= cfg.no_commit_limit:
+                        print(f"\n[!]  No progress for {cfg.no_commit_limit} consecutive iterations. Stopping.")
+                        return
 
-        # Check if progress was made (multiple signals)
-        has_new_commit = new_last_commit != last_commit
-        has_agent_commits = agent_commits > 0
-        has_worker_activity = has_claude_flow_activity(project_path, since_seconds=300)
+            except Exception as e:
+                logger.error(f"3-phase workflow iteration failed: {e}")
+                print(f"\n❌ Iteration failed: {e}")
+                no_commit_streak += 1
+                if no_commit_streak >= cfg.no_commit_limit:
+                    print(f"\n[!]  Too many failures. Stopping.")
+                    return
 
-        if has_new_commit or has_agent_commits or has_worker_activity:
-            # Progress made - reset circuit breaker
-            if has_agent_commits:
-                print(f"[OK] Progress made (agents: {agent_commits} commit(s))")
-            elif has_worker_activity:
-                print(f"[OK] Progress made (claude-flow workers active)")
-            else:
-                print(f"[OK] Progress made (new commit)")
-            no_commit_streak = 0
         else:
-            # No commits, no worker activity
-            print(f"[!]  No commits detected this iteration")
-            print(f"     Circuit breaker streak: {no_commit_streak}/{cfg.no_commit_limit}")
+            # LEGACY WORKFLOW
+            # Run pre-session validation before each iteration to sync tasks.md with codebase
+            if cfg.enable_pre_session_validation:
+                run_pre_session_validation(provider, cfg, project_path, spec_name, spec_path)
 
-        last_commit = new_last_commit
+            # Build prompt with progress summary (no specific task assignment)
+            progress_summary = f"{stats.done}/{stats.total} tasks complete ({stats.pending} pending, {stats.in_progress} in progress)"
+            prompt = cfg.prompt_template.format(
+                spec_name=spec_name,
+                progress_summary=progress_summary
+            )
+
+            log_path = log_dir / cfg.log_file_template.format(index=iteration)
+            print(f"\n[Iteration {iteration}] Letting Claude choose what to work on...")
+
+            agent_commits = run_provider(
+                provider,
+                cfg,
+                project_path,
+                prompt,
+                dry_run,
+                spec_name=spec_name,
+                iteration=iteration,
+                log_path=log_path,
+            )
+
+            new_last_commit, no_commit_streak = _check_commit_progress(
+                project_path, last_commit, no_commit_streak, cfg
+            )
+
+            # Check if progress was made (multiple signals)
+            has_new_commit = new_last_commit != last_commit
+            has_agent_commits = agent_commits > 0
+            has_worker_activity = has_claude_flow_activity(project_path, since_seconds=300)
+
+            if has_new_commit or has_agent_commits or has_worker_activity:
+                # Progress made - reset circuit breaker
+                if has_agent_commits:
+                    print(f"[OK] Progress made (agents: {agent_commits} commit(s))")
+                elif has_worker_activity:
+                    print(f"[OK] Progress made (claude-flow workers active)")
+                else:
+                    print(f"[OK] Progress made (new commit)")
+                no_commit_streak = 0
+            else:
+                # No commits, no worker activity
+                print(f"[!]  No commits detected this iteration")
+                print(f"     Circuit breaker streak: {no_commit_streak}/{cfg.no_commit_limit}")
+
+            last_commit = new_last_commit
 
 
 def main() -> int:

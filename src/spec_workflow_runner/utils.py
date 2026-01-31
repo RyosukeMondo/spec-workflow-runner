@@ -428,6 +428,10 @@ class Config:
     enable_smart_completion_check: bool = True
     completion_check_max_probes: int = 5
     completion_check_probe_interval: int = 30
+    enable_three_phase_workflow: bool = False
+    block_commits_during_implementation: bool = True
+    implementation_prompt: str = ""
+    post_session_verification_prompt: str = ""
 
     @classmethod
     def from_dict(cls, payload: dict) -> Config:
@@ -516,6 +520,14 @@ class Config:
                 f"completion_check_probe_interval must be positive, got {completion_check_probe_interval}"
             )
 
+        # Load 3-phase workflow configuration
+        enable_three_phase_workflow = bool(payload.get("enable_three_phase_workflow", False))
+        block_commits_during_implementation = bool(
+            payload.get("block_commits_during_implementation", True)
+        )
+        implementation_prompt = payload.get("implementation_prompt", "")
+        post_session_verification_prompt = payload.get("post_session_verification_prompt", "")
+
         return cls(
             repos_root=repos_root,
             spec_workflow_dir_name=payload["spec_workflow_dir_name"],
@@ -547,6 +559,10 @@ class Config:
             enable_smart_completion_check=enable_smart_completion_check,
             completion_check_max_probes=completion_check_max_probes,
             completion_check_probe_interval=completion_check_probe_interval,
+            enable_three_phase_workflow=enable_three_phase_workflow,
+            block_commits_during_implementation=block_commits_during_implementation,
+            implementation_prompt=implementation_prompt,
+            post_session_verification_prompt=post_session_verification_prompt,
         )
 
 
@@ -756,9 +772,9 @@ TASK_PATTERN = re.compile(
     re.MULTILINE | re.IGNORECASE,
 )
 
-# Pattern for alternate heading format: ### TASK-ID: Title
+# Pattern for alternate heading format: ### TASK-ID: Title or #### Task TASK-ID: Title
 HEADING_TASK_PATTERN = re.compile(
-    r"^###\s+([A-Z]+-\d+):\s*(.+)$",
+    r"^#{3,4}\s+(?:Task\s+)?([A-Z]+-\d+(?:\.\d+)?):\s*(.+)$",
     re.MULTILINE,
 )
 
