@@ -1474,15 +1474,16 @@ def run_loop(
         _display_dry_run_spec_status(spec_name, spec_path, stats)
         return
 
-    # Run pre-session validation to sync tasks.md with codebase
-    run_pre_session_validation(provider, cfg, project_path, spec_name, spec_path)
-
     no_commit_streak = 0
     iteration = 0
     log_dir = project_path / cfg.log_dir_name / spec_name
     last_commit = get_current_commit(project_path)
 
     while True:
+        # Run pre-session validation before each iteration to sync tasks.md with codebase
+        if cfg.enable_pre_session_validation:
+            run_pre_session_validation(provider, cfg, project_path, spec_name, spec_path)
+
         stats = read_task_stats(tasks_path)
         remaining = stats.total - stats.done
 
