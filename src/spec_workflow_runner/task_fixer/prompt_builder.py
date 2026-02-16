@@ -44,8 +44,6 @@ class PromptBuilder:
         prompt_parts = [
             "You are a format correction assistant. Your task is to fix format errors in a tasks.md file.",
             "",
-            "[!] **IMPORTANT: NO launch swarms on this session** - Do not invoke agents or use multiple threading to prevent hang-ups from thread management failures.",
-            "",
             "# INSTRUCTIONS",
             "",
             "1. Review the TEMPLATE FORMAT below to understand the correct format",
