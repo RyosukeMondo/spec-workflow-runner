@@ -10,7 +10,7 @@ from __future__ import annotations
 import json
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -24,7 +24,6 @@ except ImportError:
     sys.exit(1)
 
 from spec_workflow_runner.utils import Config, discover_projects, load_config
-
 
 # Performance thresholds from tech.md
 THRESHOLDS = {
@@ -47,7 +46,7 @@ class MetricsCollector:
         self.config_path = config_path
         self.config: Config | None = None
         self.metrics: dict[str, Any] = {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "timestamp": datetime.now(UTC).isoformat(),
             "startup_ms": 0.0,
             "memory_mb": 0.0,
             "poll_latency_ms": 0.0,
@@ -202,10 +201,22 @@ def print_summary(metrics: dict[str, Any]) -> None:
     """
     print("\n=== Performance Metrics Summary ===", file=sys.stderr)
     print(f"Timestamp: {metrics['timestamp']}", file=sys.stderr)
-    print(f"Startup Time: {metrics['startup_ms']:.1f}ms (threshold: {THRESHOLDS['startup_ms']}ms)", file=sys.stderr)
-    print(f"Memory Usage: {metrics['memory_mb']:.1f}MB (threshold: {THRESHOLDS['memory_mb']}MB)", file=sys.stderr)
-    print(f"Poll Latency: {metrics['poll_latency_ms']:.1f}ms (threshold: {THRESHOLDS['poll_latency_ms']}ms)", file=sys.stderr)
-    print(f"CPU Idle: {metrics['cpu_percent_idle']:.1f}% (threshold: {THRESHOLDS['cpu_percent_idle']}%)", file=sys.stderr)
+    print(
+        f"Startup Time: {metrics['startup_ms']:.1f}ms (threshold: {THRESHOLDS['startup_ms']}ms)",
+        file=sys.stderr,
+    )
+    print(
+        f"Memory Usage: {metrics['memory_mb']:.1f}MB (threshold: {THRESHOLDS['memory_mb']}MB)",
+        file=sys.stderr,
+    )
+    print(
+        f"Poll Latency: {metrics['poll_latency_ms']:.1f}ms (threshold: {THRESHOLDS['poll_latency_ms']}ms)",
+        file=sys.stderr,
+    )
+    print(
+        f"CPU Idle: {metrics['cpu_percent_idle']:.1f}% (threshold: {THRESHOLDS['cpu_percent_idle']}%)",
+        file=sys.stderr,
+    )
 
     if metrics["thresholds_passed"]:
         print("\n✅ All thresholds passed!", file=sys.stderr)

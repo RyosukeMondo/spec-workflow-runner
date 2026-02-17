@@ -15,7 +15,7 @@ def safe_print(text: str):
         print(text)
     except UnicodeEncodeError:
         # Fallback to ASCII-safe printing
-        safe_text = text.encode('ascii', errors='replace').decode('ascii')
+        safe_text = text.encode("ascii", errors="replace").decode("ascii")
         print(safe_text)
 
 
@@ -59,6 +59,7 @@ def validate_modules():
             RetryContext,
             RetryHandler,
         )
+
         safe_print("  [OK] retry_handler module imports successfully")
     except ImportError as e:
         safe_print(f"  [FAIL] Failed to import retry_handler: {e}")
@@ -69,6 +70,7 @@ def validate_modules():
             monitor_process_with_timeout,
             safe_terminate_process,
         )
+
         safe_print("  [OK] subprocess_helpers enhancements import successfully")
     except ImportError as e:
         safe_print(f"  [FAIL] Failed to import subprocess_helpers: {e}")
@@ -76,6 +78,7 @@ def validate_modules():
 
     try:
         from spec_workflow_runner.utils import Config
+
         safe_print("  [OK] utils.Config imports successfully")
     except ImportError as e:
         safe_print(f"  [FAIL] Failed to import utils: {e}")
@@ -83,6 +86,7 @@ def validate_modules():
 
     try:
         from spec_workflow_runner.tui.models import RunnerState
+
         safe_print("  [OK] tui.models.RunnerState imports successfully")
     except ImportError as e:
         safe_print(f"  [FAIL] Failed to import tui.models: {e}")
@@ -106,7 +110,9 @@ def validate_config_loading():
 
         safe_print(f"  [OK] retry_config.max_retries: {config.retry_config.max_retries}")
         safe_print(f"  [OK] retry_config.retry_on_crash: {config.retry_config.retry_on_crash}")
-        safe_print(f"  [OK] retry_config.retry_backoff_seconds: {config.retry_config.retry_backoff_seconds}")
+        safe_print(
+            f"  [OK] retry_config.retry_backoff_seconds: {config.retry_config.retry_backoff_seconds}"
+        )
 
         return True
     except Exception as e:
@@ -119,9 +125,10 @@ def validate_runner_state_serialization():
     safe_print("\n[OK] Validating RunnerState serialization...")
 
     try:
-        from spec_workflow_runner.tui.models import RunnerState, RunnerStatus
         from datetime import datetime
         from pathlib import Path
+
+        from spec_workflow_runner.tui.models import RunnerState, RunnerStatus
 
         # Create a RunnerState with retry fields
         runner = RunnerState(
@@ -159,10 +166,10 @@ def validate_runner_state_serialization():
         restored = RunnerState.from_dict(data)
 
         if restored.retry_count != runner.retry_count:
-            safe_print(f"  [FAIL] Deserialized retry_count mismatch")
+            safe_print("  [FAIL] Deserialized retry_count mismatch")
             return False
         if restored.max_retries != runner.max_retries:
-            safe_print(f"  [FAIL] Deserialized max_retries mismatch")
+            safe_print("  [FAIL] Deserialized max_retries mismatch")
             return False
 
         safe_print("  [OK] Deserialization successful")
@@ -171,6 +178,7 @@ def validate_runner_state_serialization():
     except Exception as e:
         safe_print(f"  [FAIL] Failed: {e}")
         import traceback
+
         traceback.print_exc()
         return False
 
@@ -215,6 +223,7 @@ def main():
         except Exception as e:
             safe_print(f"\n[FAIL] {name} raised exception: {e}")
             import traceback
+
             traceback.print_exc()
             results.append((name, False))
 

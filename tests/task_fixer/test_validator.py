@@ -181,7 +181,9 @@ def test_inconsistent_numbering(validator: TaskValidator, temp_dir: TemporaryDir
     result = validator.validate_file(test_file)
 
     assert not result.is_valid
-    inconsistent_issues = [i for i in result.issues if i.issue_type == IssueType.INCONSISTENT_NUMBERING]
+    inconsistent_issues = [
+        i for i in result.issues if i.issue_type == IssueType.INCONSISTENT_NUMBERING
+    ]
     assert len(inconsistent_issues) == 2
     assert "Expected task ID 2, found 3" in inconsistent_issues[0].message
     assert "Expected task ID 4, found 5" in inconsistent_issues[1].message
@@ -296,7 +298,9 @@ def test_error_summary_formatting(validator: TaskValidator, temp_dir: TemporaryD
     assert "Line 4:" in summary
 
 
-def test_skip_blank_lines_and_headers(validator: TaskValidator, temp_dir: TemporaryDirectory) -> None:
+def test_skip_blank_lines_and_headers(
+    validator: TaskValidator, temp_dir: TemporaryDirectory
+) -> None:
     """Test that blank lines and headers are skipped."""
     content = """# Tasks Document
 
@@ -318,7 +322,9 @@ def test_skip_blank_lines_and_headers(validator: TaskValidator, temp_dir: Tempor
     assert result.issue_count == 0
 
 
-def test_validation_result_properties(validator: TaskValidator, temp_dir: TemporaryDirectory) -> None:
+def test_validation_result_properties(
+    validator: TaskValidator, temp_dir: TemporaryDirectory
+) -> None:
     """Test ValidationResult properties."""
     content = """# Tasks Document
 
@@ -344,7 +350,7 @@ def test_validation_issue_immutability() -> None:
         issue_type=IssueType.MISSING_CHECKBOX,
         line_number=1,
         line_content="test",
-        message="test message"
+        message="test message",
     )
 
     with pytest.raises(Exception):  # FrozenInstanceError or AttributeError
@@ -369,13 +375,10 @@ def test_validation_result_immutability() -> None:
         ("[y]", False),
         ("[n]", False),
         ("[X]", False),  # Uppercase not allowed
-    ]
+    ],
 )
 def test_checkbox_validation_parametrized(
-    validator: TaskValidator,
-    temp_dir: TemporaryDirectory,
-    checkbox: str,
-    expected_valid: bool
+    validator: TaskValidator, temp_dir: TemporaryDirectory, checkbox: str, expected_valid: bool
 ) -> None:
     """Test various checkbox formats."""
     content = f"""# Tasks Document
@@ -402,13 +405,10 @@ def test_checkbox_validation_parametrized(
         ("a.", False),
         ("1", False),  # Missing period
         ("1.a.", False),
-    ]
+    ],
 )
 def test_task_id_validation_parametrized(
-    validator: TaskValidator,
-    temp_dir: TemporaryDirectory,
-    task_id: str,
-    expected_valid: bool
+    validator: TaskValidator, temp_dir: TemporaryDirectory, task_id: str, expected_valid: bool
 ) -> None:
     """Test various task ID formats."""
     content = f"""# Tasks Document
@@ -425,8 +425,7 @@ def test_task_id_validation_parametrized(
 
 
 def test_subtasks_flexible_numbering(
-    validator: TaskValidator,
-    temp_dir: TemporaryDirectory
+    validator: TaskValidator, temp_dir: TemporaryDirectory
 ) -> None:
     """Test that subtasks can skip numbers."""
     content = """# Tasks Document
@@ -469,7 +468,8 @@ def test_file_read_error_handling(validator: TaskValidator, temp_dir: TemporaryD
     # Make file unreadable (Unix only)
     import os
     import stat
-    if os.name != 'nt':  # Skip on Windows
+
+    if os.name != "nt":  # Skip on Windows
         test_file.chmod(0o000)
 
         result = validator.validate_file(test_file)
@@ -497,7 +497,9 @@ def test_whitespace_only_title(validator: TaskValidator, temp_dir: TemporaryDire
     assert len(title_issues) == 2
 
 
-def test_invalid_checkbox_with_valid_id(validator: TaskValidator, temp_dir: TemporaryDirectory) -> None:
+def test_invalid_checkbox_with_valid_id(
+    validator: TaskValidator, temp_dir: TemporaryDirectory
+) -> None:
     """Test line with valid task ID but invalid checkbox triggers INVALID_CHECKBOX.
 
     This happens when:

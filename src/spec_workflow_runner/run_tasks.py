@@ -23,7 +23,6 @@ from .utils import (
     RunnerError,
     TaskStats,
     check_clean_working_tree,
-    check_mcp_server_exists,
     choose_option,
     discover_projects,
     discover_specs,
@@ -31,7 +30,6 @@ from .utils import (
     display_overall_progress,
     display_spec_queue,
     get_active_claude_account,
-    get_all_spec_progress,
     get_current_commit,
     has_claude_flow_activity,
     has_uncommitted_changes,
@@ -41,7 +39,6 @@ from .utils import (
     is_timeout_error,
     list_unfinished_specs,
     load_config,
-    monitor_claude_flow_workers,
     read_task_details,
     read_task_stats,
     reduce_spec_context,
@@ -58,7 +55,7 @@ def safe_print(text: str, **kwargs) -> None:
         print(text, **kwargs)
     except UnicodeEncodeError:
         # Replace problematic characters with ASCII equivalents
-        print(text.encode('ascii', errors='replace').decode('ascii'), **kwargs)
+        print(text.encode("ascii", errors="replace").decode("ascii"), **kwargs)
 
 
 class AllSpecsSentinel:
@@ -167,7 +164,9 @@ def _parse_spec_indices(input_str: str, specs: list[tuple[str, Path]]) -> list[t
     try:
         indices = [int(idx.strip()) for idx in input_str.split(",")]
     except ValueError:
-        raise RunnerError(f"Invalid index format: '{input_str}'. Use comma-separated numbers like '1,3,5'")
+        raise RunnerError(
+            f"Invalid index format: '{input_str}'. Use comma-separated numbers like '1,3,5'"
+        )
 
     selected = []
     for idx in indices:
@@ -275,9 +274,9 @@ def run_multiple_specs(
     """Run multiple specs in the specified order."""
     if dry_run:
         print("\n[DRY-RUN MODE] Selected specs in order:")
-        print(f"{'='*90}")
+        print(f"{'=' * 90}")
         print(f"{'#':<6}{'Spec Name':<40}{'Status':<25}{'Created'}")
-        print(f"{'-'*90}")
+        print(f"{'-' * 90}")
 
         for idx, (name, spec_path) in enumerate(specs, start=1):
             tasks_path = spec_path / cfg.tasks_filename
@@ -291,15 +290,15 @@ def run_multiple_specs(
                 status = "No tasks.md found"
             print(f"{idx:<6}{name:<40}{status:<25}{created_date}")
 
-        print(f"{'-'*90}")
+        print(f"{'-' * 90}")
         print(f"Total: {len(specs)} spec(s) will be processed in this order\n")
         return
 
     print(f"\nRunning {len(specs)} specs in specified order...")
     for idx, (spec_name, spec_path) in enumerate(specs, start=1):
-        print(f"\n{'='*90}")
+        print(f"\n{'=' * 90}")
         print(f"Processing spec {idx}/{len(specs)}: '{spec_name}'")
-        print(f"{'='*90}")
+        print(f"{'=' * 90}")
         run_loop(provider, cfg, project, spec_name, spec_path, dry_run)
         print(f"[OK] Completed spec '{spec_name}' ({idx}/{len(specs)})")
 
@@ -314,7 +313,9 @@ def run_all_specs(
     if dry_run:
         print("\n[DRY-RUN MODE] Displaying spec queue without executing...")
         display_spec_queue(project, cfg)
-        print("\n[DRY-RUN MODE] Would continuously poll every 10 minutes for new specs after all tasks complete.")
+        print(
+            "\n[DRY-RUN MODE] Would continuously poll every 10 minutes for new specs after all tasks complete."
+        )
         return
 
     print("\nRunning unfinished specs in sequence.")
@@ -434,15 +435,17 @@ def mark_task_status(tasks_file: Path, task_id: str, new_status: str) -> bool:
     status_map = {" ": "Pending", "-": "In Progress", "x": "Completed"}
     status_word = status_map.get(new_status, new_status)
 
-    heading_pattern = re.compile(rf"^### {re.escape(task_id)}:.+?(\*\*Status\*\*:\s*)\w+", re.MULTILINE | re.DOTALL)
+    heading_pattern = re.compile(
+        rf"^### {re.escape(task_id)}:.+?(\*\*Status\*\*:\s*)\w+", re.MULTILINE | re.DOTALL
+    )
     match = heading_pattern.search(content)
 
     if match:
         # Heading format - replace **Status**: Old with **Status**: New
-        old_status_pattern = re.compile(rf"(\*\*Status\*\*:\s*)\w+")
+        old_status_pattern = re.compile(r"(\*\*Status\*\*:\s*)\w+")
         # Find the status line after the heading
         task_start = content.find(f"### {task_id}:")
-        task_section = content[task_start:task_start+500]  # Look in next 500 chars
+        task_section = content[task_start : task_start + 500]  # Look in next 500 chars
         status_match = old_status_pattern.search(task_section)
 
         if status_match:
@@ -469,8 +472,8 @@ def parse_tasks_alternate_format(tasks_file: Path) -> list[dict]:
     tasks = []
 
     # Find all ### Task headings
-    task_pattern = re.compile(r'^### ([A-Z]+-\d+): (.+)$', re.MULTILINE)
-    status_pattern = re.compile(r'\*\*Status\*\*:\s*(\w+)', re.IGNORECASE)
+    task_pattern = re.compile(r"^### ([A-Z]+-\d+): (.+)$", re.MULTILINE)
+    status_pattern = re.compile(r"\*\*Status\*\*:\s*(\w+)", re.IGNORECASE)
 
     matches = list(task_pattern.finditer(content))
 
@@ -487,12 +490,9 @@ def parse_tasks_alternate_format(tasks_file: Path) -> list[dict]:
         status_match = status_pattern.search(task_content)
         status = status_match.group(1).lower() if status_match else "pending"
 
-        tasks.append({
-            "id": task_id,
-            "title": task_title,
-            "status": status,
-            "content": task_content.strip()
-        })
+        tasks.append(
+            {"id": task_id, "title": task_title, "status": status, "content": task_content.strip()}
+        )
 
     return tasks
 
@@ -502,7 +502,7 @@ def build_prompt(cfg: Config, spec_name: str, spec_path: Path, stats: TaskStats)
 
     Parses tasks.md to find the first pending task and includes its details in the prompt.
     """
-    from .tui.task_parser import parse_tasks_file, TaskStatus
+    from .tui.task_parser import TaskStatus, parse_tasks_file
 
     # Parse tasks.md to find first pending task
     tasks_file = spec_path / cfg.tasks_filename
@@ -519,6 +519,7 @@ def build_prompt(cfg: Config, spec_name: str, spec_path: Path, stats: TaskStats)
         if alt_pending:
             # Convert to Task-like structure
             from dataclasses import dataclass
+
             @dataclass
             class AltTask:
                 id: str
@@ -528,7 +529,7 @@ def build_prompt(cfg: Config, spec_name: str, spec_path: Path, stats: TaskStats)
             pending_task = AltTask(
                 id=alt_pending["id"],
                 title=alt_pending["title"],
-                description=[alt_pending["content"]]
+                description=[alt_pending["content"]],
             )
 
     if not pending_task:
@@ -536,7 +537,11 @@ def build_prompt(cfg: Config, spec_name: str, spec_path: Path, stats: TaskStats)
         return f"All tasks for spec '{spec_name}' are complete or in progress. Nothing to do."
 
     # Format task description (join the description lines)
-    task_desc = "\n".join(pending_task.description) if pending_task.description else "No additional details provided."
+    task_desc = (
+        "\n".join(pending_task.description)
+        if pending_task.description
+        else "No additional details provided."
+    )
 
     remaining = stats.total - stats.done
     context = {
@@ -623,7 +628,7 @@ def _execute_provider_command(
     log_path: Path,
     activity_timeout_seconds: int | None = None,
     activity_check_interval_seconds: int = 300,
-    ignore_dirs: tuple[str, ...] = ()
+    ignore_dirs: tuple[str, ...] = (),
 ) -> int:
     """Execute provider command and stream output to log with activity-based timeout.
 
@@ -645,13 +650,18 @@ def _execute_provider_command(
 
     # Save command to file for debugging
     import tempfile
+
     cmd_file = Path(tempfile.gettempdir()) / "last_command.txt"
     cmd_file.write_text(formatted_command, encoding="utf-8")
 
     print("\nRunning:", formatted_command)
     if activity_timeout_seconds:
-        print(f"Activity timeout: {activity_timeout_seconds}s ({activity_timeout_seconds // 60} minutes of inactivity)")
-        print(f"Checking activity every: {activity_check_interval_seconds}s ({activity_check_interval_seconds // 60} minutes)")
+        print(
+            f"Activity timeout: {activity_timeout_seconds}s ({activity_timeout_seconds // 60} minutes of inactivity)"
+        )
+        print(
+            f"Checking activity every: {activity_check_interval_seconds}s ({activity_check_interval_seconds // 60} minutes)"
+        )
 
     output_lines: list[str] = []
     early_termination_flag = {"triggered": False}  # Use dict for mutability across threads
@@ -671,7 +681,6 @@ def _execute_provider_command(
 
         line_count = 0
         while True:
-            import sys
             sys.stderr.flush()
             line = proc.stdout.readline()
             sys.stderr.flush()
@@ -711,7 +720,10 @@ def _execute_provider_command(
                                         print(text, flush=True)
                                     except UnicodeEncodeError:
                                         # Replace problematic characters with ASCII equivalents
-                                        print(text.encode('ascii', errors='replace').decode('ascii'), flush=True)
+                                        print(
+                                            text.encode("ascii", errors="replace").decode("ascii"),
+                                            flush=True,
+                                        )
                                 elif item.get("type") == "tool_use":
                                     tool_name = item.get("name", "unknown")
                                     tool_use_id = item.get("id")
@@ -724,7 +736,10 @@ def _execute_provider_command(
                                     try:
                                         print(f"[Thinking: {thinking}...]", flush=True)
                                     except UnicodeEncodeError:
-                                        print(f"[Thinking: {thinking.encode('ascii', errors='replace').decode('ascii')}...]", flush=True)
+                                        print(
+                                            f"[Thinking: {thinking.encode('ascii', errors='replace').decode('ascii')}...]",
+                                            flush=True,
+                                        )
 
                 elif msg_type == "result":
                     # Show final result
@@ -739,24 +754,33 @@ def _execute_provider_command(
                         content = data.get("content", "")
                         # Try to parse agent ID from the result
                         import re
+
                         # Look for patterns like "agent ID: xyz" or similar
                         if isinstance(content, str):
-                            agent_match = re.search(r'agent[_\s]+(?:ID|id)[\s:]+([a-zA-Z0-9_-]+)', content, re.IGNORECASE)
+                            agent_match = re.search(
+                                r"agent[_\s]+(?:ID|id)[\s:]+([a-zA-Z0-9_-]+)",
+                                content,
+                                re.IGNORECASE,
+                            )
                             if agent_match:
                                 agent_id = agent_match.group(1)
-                                spawned_agents.append({
-                                    "agent_id": agent_id,
-                                    "tool_use_id": tool_use_id,
-                                    "content": content[:200]
-                                })
+                                spawned_agents.append(
+                                    {
+                                        "agent_id": agent_id,
+                                        "tool_use_id": tool_use_id,
+                                        "content": content[:200],
+                                    }
+                                )
                                 print(f"[!]  Task agent detected: {agent_id}", flush=True)
                             else:
                                 # No clear agent ID, but still record the Task spawn
-                                spawned_agents.append({
-                                    "agent_id": f"unknown_{tool_use_id}",
-                                    "tool_use_id": tool_use_id,
-                                    "content": content[:200]
-                                })
+                                spawned_agents.append(
+                                    {
+                                        "agent_id": f"unknown_{tool_use_id}",
+                                        "tool_use_id": tool_use_id,
+                                        "content": content[:200],
+                                    }
+                                )
                                 print(f"[!]  Task agent spawned (id: {tool_use_id})", flush=True)
 
                 # If message type not handled, silently skip (don't spam console)
@@ -773,6 +797,7 @@ def _execute_provider_command(
                 early_termination_flag["triggered"] = True
                 # Give it a moment to finish output, then kill
                 import time
+
                 time.sleep(2)
                 if proc.poll() is None:  # Still running
                     try:
@@ -780,10 +805,9 @@ def _execute_provider_command(
                         time.sleep(1)
                         if proc.poll() is None:  # Still alive
                             proc.kill()  # Force kill if terminate didn't work
-                    except Exception as e:
+                    except Exception:
                         pass  # Ignore errors during termination
                 break  # Exit the loop immediately after killing
-
 
     with log_path.open("w", encoding="utf-8") as handle:
         handle.write(header)
@@ -797,23 +821,18 @@ def _execute_provider_command(
             env_additions={"PYTHONUNBUFFERED": "1"},
         )
 
-
         # Start output reading thread
         reader_thread = threading.Thread(
-            target=read_output,
-            args=(proc, handle, output_lines),
-            daemon=True
+            target=read_output, args=(proc, handle, output_lines), daemon=True
         )
         reader_thread.start()
 
         # Note: Session monitoring only works for interactive mode, not --print mode
         # In --print mode, we can only monitor file system changes
-        print(f"[MONITOR] Monitoring file system activity (--print mode has no session logs)...")
-        print(f"\n{'='*80}")
-        print(f"Claude Output:")
-        print(f"{'='*80}\n")
-        session_started = False
-        session_monitor = None
+        print("[MONITOR] Monitoring file system activity (--print mode has no session logs)...")
+        print(f"\n{'=' * 80}")
+        print("Claude Output:")
+        print(f"{'=' * 80}\n")
 
         # Wait for process with activity-based timeout monitoring
         returncode = None
@@ -829,40 +848,51 @@ def _execute_provider_command(
                 # Check process status with short timeout for responsive display
                 returncode = proc.wait(timeout=display_interval)
             except subprocess.TimeoutExpired:
-                    # Process hasn't finished yet - check for file modifications
-                    current_time = time.time()
-                    current_mtime = _get_latest_file_mtime(project_path, ignore_dirs)
-                    file_has_activity = current_mtime > last_mtime
+                # Process hasn't finished yet - check for file modifications
+                current_time = time.time()
+                current_mtime = _get_latest_file_mtime(project_path, ignore_dirs)
+                file_has_activity = current_mtime > last_mtime
 
-                    if file_has_activity:
-                        last_mtime = current_mtime
-                        print(f"[{datetime.now().strftime('%H:%M:%S')}] [FILE] File modified - Claude is working")
+                if file_has_activity:
+                    last_mtime = current_mtime
+                    print(
+                        f"[{datetime.now().strftime('%H:%M:%S')}] [FILE] File modified - Claude is working"
+                    )
 
-                    # Check for timeout at configured interval
-                    if activity_timeout_seconds and (current_time - last_timeout_check) >= activity_check_interval_seconds:
-                        last_timeout_check = current_time
-                        inactivity_seconds = int(current_time - last_mtime)
+                # Check for timeout at configured interval
+                if (
+                    activity_timeout_seconds
+                    and (current_time - last_timeout_check) >= activity_check_interval_seconds
+                ):
+                    last_timeout_check = current_time
+                    inactivity_seconds = int(current_time - last_mtime)
 
-                        if inactivity_seconds > activity_timeout_seconds:
-                            # Inactivity timeout - kill the process
-                            print(f"\n[!]  No file changes for {inactivity_seconds}s (>{activity_timeout_seconds}s). Terminating process...")
-                            proc.kill()
-                            reader_thread.join(timeout=5)
-                            handle.write(f"\n# Inactivity Timeout\nProcess terminated after {inactivity_seconds} seconds of inactivity\n")
-                            handle.write(f"\n# Exit Code\nINACTIVITY_TIMEOUT\n")
-                            raise RunnerError(
-                                f"Provider command timed out due to {inactivity_seconds} seconds of inactivity "
-                                f"(threshold: {activity_timeout_seconds}s = {activity_timeout_seconds // 60} minutes). "
-                                f"The AI may be stuck or waiting for input."
-                            )
-                        else:
-                            # Show periodic status
-                            mins = inactivity_seconds // 60
-                            secs = inactivity_seconds % 60
-                            print(f"[{datetime.now().strftime('%H:%M:%S')}] [WAIT] Running... (no file changes for {mins}m {secs}s, max: {activity_timeout_seconds // 60}m)")
+                    if inactivity_seconds > activity_timeout_seconds:
+                        # Inactivity timeout - kill the process
+                        print(
+                            f"\n[!]  No file changes for {inactivity_seconds}s (>{activity_timeout_seconds}s). Terminating process..."
+                        )
+                        proc.kill()
+                        reader_thread.join(timeout=5)
+                        handle.write(
+                            f"\n# Inactivity Timeout\nProcess terminated after {inactivity_seconds} seconds of inactivity\n"
+                        )
+                        handle.write("\n# Exit Code\nINACTIVITY_TIMEOUT\n")
+                        raise RunnerError(
+                            f"Provider command timed out due to {inactivity_seconds} seconds of inactivity "
+                            f"(threshold: {activity_timeout_seconds}s = {activity_timeout_seconds // 60} minutes). "
+                            f"The AI may be stuck or waiting for input."
+                        )
+                    else:
+                        # Show periodic status
+                        mins = inactivity_seconds // 60
+                        secs = inactivity_seconds % 60
+                        print(
+                            f"[{datetime.now().strftime('%H:%M:%S')}] [WAIT] Running... (no file changes for {mins}m {secs}s, max: {activity_timeout_seconds // 60}m)"
+                        )
 
-                    # Continue loop
-                    continue
+                # Continue loop
+                continue
 
         # Wait for output thread to finish (with timeout to avoid hanging)
         reader_thread.join(timeout=10)
@@ -871,7 +901,7 @@ def _execute_provider_command(
 
         # Write note about early termination if it occurred (before closing file)
         if early_termination_flag["triggered"]:
-            handle.write(f"\n# Note\nProcess killed early due to 'No messages returned' error\n")
+            handle.write("\n# Note\nProcess killed early due to 'No messages returned' error\n")
 
         handle.write(f"\n# Exit Code\n{returncode}\n")
 
@@ -882,8 +912,10 @@ def _execute_provider_command(
     if returncode != 0:
         # If process was killed due to "No messages returned", treat as potentially successful
         if has_no_messages_error and returncode == -9:  # -9 = SIGKILL
-            print(f"[!]  Process terminated due to 'No messages returned' error")
-            print(f"   Treating as potentially successful. Circuit breaker will stop if no progress.")
+            print("[!]  Process terminated due to 'No messages returned' error")
+            print(
+                "   Treating as potentially successful. Circuit breaker will stop if no progress."
+            )
             print(f"Saved log: {log_path}")
             return 0  # Don't raise error - let circuit breaker handle it
 
@@ -897,16 +929,18 @@ def _execute_provider_command(
 
     # Check if Claude spawned Task agents despite instructions
     if spawned_agents:
-        print(f"\n{'='*80}")
-        print(f"[!]  WARNING: Claude spawned {len(spawned_agents)} Task agent(s) despite instructions!")
-        print(f"{'='*80}")
+        print(f"\n{'=' * 80}")
+        print(
+            f"[!]  WARNING: Claude spawned {len(spawned_agents)} Task agent(s) despite instructions!"
+        )
+        print(f"{'=' * 80}")
         for i, agent_info in enumerate(spawned_agents, 1):
             agent_id = agent_info["agent_id"]
             print(f"  {i}. Agent: {agent_id}")
 
-        print(f"\n[WAIT] Waiting for spawned agents to complete...")
-        print(f"   Monitoring file system activity and commits")
-        print(f"   Will wait up to 10 minutes, or until 60s of inactivity\n")
+        print("\n[WAIT] Waiting for spawned agents to complete...")
+        print("   Monitoring file system activity and commits")
+        print("   Will wait up to 10 minutes, or until 60s of inactivity\n")
 
         # Monitor for agent completion
         start_time = time.time()
@@ -926,7 +960,9 @@ def _execute_provider_command(
 
             # Check for maximum timeout
             if elapsed > max_total_wait:
-                print(f"\n[{datetime.now().strftime('%H:%M:%S')}] [TIMEOUT] Maximum wait time reached (10 minutes)")
+                print(
+                    f"\n[{datetime.now().strftime('%H:%M:%S')}] [TIMEOUT] Maximum wait time reached (10 minutes)"
+                )
                 break
 
             # Check for file system activity
@@ -934,7 +970,9 @@ def _execute_provider_command(
             if current_mtime > last_mtime:
                 last_mtime = current_mtime
                 last_activity_time = time.time()
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] [FILE] File activity detected (agents working...)")
+                print(
+                    f"[{datetime.now().strftime('%H:%M:%S')}] [FILE] File activity detected (agents working...)"
+                )
 
             # Check for new commits
             current_commit = get_current_commit(project_path)
@@ -949,16 +987,22 @@ def _execute_provider_command(
                         cwd=project_path,
                         capture_output=True,
                         text=True,
-                        check=True
+                        check=True,
                     )
                     commit_msg = result.stdout.strip()
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] [OK] New commit detected: {commit_msg}")
+                    print(
+                        f"[{datetime.now().strftime('%H:%M:%S')}] [OK] New commit detected: {commit_msg}"
+                    )
                 except Exception:
-                    print(f"[{datetime.now().strftime('%H:%M:%S')}] [OK] New commit detected: {current_commit[:8]}")
+                    print(
+                        f"[{datetime.now().strftime('%H:%M:%S')}] [OK] New commit detected: {current_commit[:8]}"
+                    )
 
             # Check for inactivity threshold
             if inactivity > inactivity_threshold:
-                print(f"\n[{datetime.now().strftime('%H:%M:%S')}] [DONE] No activity for {int(inactivity)}s - agents appear complete")
+                print(
+                    f"\n[{datetime.now().strftime('%H:%M:%S')}] [DONE] No activity for {int(inactivity)}s - agents appear complete"
+                )
                 break
 
             # Show periodic status
@@ -966,15 +1010,17 @@ def _execute_provider_command(
                 mins_elapsed = int(elapsed) // 60
                 secs_elapsed = int(elapsed) % 60
                 inactive_secs = int(inactivity)
-                print(f"[{datetime.now().strftime('%H:%M:%S')}] [WAIT] Waiting... ({mins_elapsed}m {secs_elapsed}s elapsed, {inactive_secs}s inactive, {len(commits_detected)} commits)")
+                print(
+                    f"[{datetime.now().strftime('%H:%M:%S')}] [WAIT] Waiting... ({mins_elapsed}m {secs_elapsed}s elapsed, {inactive_secs}s inactive, {len(commits_detected)} commits)"
+                )
 
             time.sleep(5)  # Check every 5 seconds
 
-        print(f"\n{'='*80}")
-        print(f"[DONE] Agent monitoring complete")
+        print(f"\n{'=' * 80}")
+        print("[DONE] Agent monitoring complete")
         print(f"  - Total time: {int(elapsed)}s")
         print(f"  - Commits detected: {len(commits_detected)}")
-        print(f"{'='*80}\n")
+        print(f"{'=' * 80}\n")
 
         # Return number of commits detected during agent work
         return len(commits_detected)
@@ -1016,7 +1062,7 @@ def run_provider(
                 log_path,
                 activity_timeout_seconds=cfg.activity_timeout_seconds,
                 activity_check_interval_seconds=cfg.activity_check_interval_seconds,
-                ignore_dirs=cfg.ignore_dirs
+                ignore_dirs=cfg.ignore_dirs,
             )
             if attempt > 1:
                 logger.info(
@@ -1077,7 +1123,9 @@ def run_provider(
                 )
 
                 # Try to reduce context by archiving implementation logs
-                print("[!]  Activity timeout (no file changes detected). Attempting to reduce context...")
+                print(
+                    "[!]  Activity timeout (no file changes detected). Attempting to reduce context..."
+                )
                 context_reduced = reduce_spec_context(project_path, spec_name, cfg)
 
                 if context_reduced:
@@ -1362,13 +1410,13 @@ def run_provider(
 def _display_dry_run_spec_status(spec_name: str, spec_path: Path, stats: TaskStats) -> None:
     """Display dry-run status for a single spec."""
     print(f"\n[DRY-RUN MODE] Spec: {spec_name}")
-    print(f"{'='*90}")
+    print(f"{'=' * 90}")
     print(f"Status: {stats.summary()}")
     print(f"Path: {spec_path}")
     ctime = spec_path.stat().st_ctime
     created_date = datetime.fromtimestamp(ctime).strftime("%Y-%m-%d %H:%M:%S")
     print(f"Created: {created_date}")
-    print(f"{'='*90}")
+    print(f"{'=' * 90}")
     if stats.done >= stats.total:
         print("[OK] All tasks complete. Nothing to run.")
     else:
@@ -1429,9 +1477,9 @@ def run_pre_session_validation(
     if not cfg.enable_pre_session_validation:
         return
 
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print(f"PRE-SESSION VALIDATION: {spec_name}")
-    print(f"{'='*80}\n")
+    print(f"{'=' * 80}\n")
     print("Validating and syncing tasks.md with codebase status...\n")
 
     prompt = cfg.pre_session_validation_prompt.format(spec_name=spec_name)
@@ -1486,9 +1534,9 @@ def run_three_phase_iteration(
     # ===================================================================
     # PHASE 1: PRE-SESSION VALIDATION
     # ===================================================================
-    print(f"\n{'='*80}")
-    print(f"PHASE 1: PRE-SESSION VALIDATION")
-    print(f"{'='*80}\n")
+    print(f"\n{'=' * 80}")
+    print("PHASE 1: PRE-SESSION VALIDATION")
+    print(f"{'=' * 80}\n")
 
     validation_log = log_dir / f"validation_{iteration}.log"
     validation_log.parent.mkdir(parents=True, exist_ok=True)
@@ -1504,7 +1552,7 @@ def run_three_phase_iteration(
         # Log validation results
         with validation_log.open("w") as f:
             f.write(f"Iteration {iteration} - Validation Results\n")
-            f.write(f"{'='*80}\n\n")
+            f.write(f"{'=' * 80}\n\n")
             f.write(validation_result.summary() + "\n\n")
 
             for val in validation_result.validations:
@@ -1527,9 +1575,9 @@ def run_three_phase_iteration(
     # ===================================================================
     # PHASE 2: IMPLEMENTATION SESSION
     # ===================================================================
-    print(f"\n{'='*80}")
-    print(f"PHASE 2: IMPLEMENTATION SESSION")
-    print(f"{'='*80}\n")
+    print(f"\n{'=' * 80}")
+    print("PHASE 2: IMPLEMENTATION SESSION")
+    print(f"{'=' * 80}\n")
 
     # Get current stats
     stats = read_task_stats(tasks_path)
@@ -1580,9 +1628,9 @@ def run_three_phase_iteration(
     # ===================================================================
     # PHASE 3: POST-SESSION VERIFICATION
     # ===================================================================
-    print(f"\n{'='*80}")
-    print(f"PHASE 3: POST-SESSION VERIFICATION")
-    print(f"{'='*80}\n")
+    print(f"\n{'=' * 80}")
+    print("PHASE 3: POST-SESSION VERIFICATION")
+    print(f"{'=' * 80}\n")
 
     verification_log = log_dir / f"verification_{iteration}.log"
 
@@ -1598,11 +1646,13 @@ def run_three_phase_iteration(
         # Log verification results
         with verification_log.open("w") as f:
             f.write(f"Iteration {iteration} - Verification Results\n")
-            f.write(f"{'='*80}\n\n")
+            f.write(f"{'=' * 80}\n\n")
             f.write(verification_result.summary() + "\n\n")
 
             completed = [v for v in verification_result.verifications if v.should_mark_complete]
-            incomplete = [v for v in verification_result.verifications if not v.should_mark_complete]
+            incomplete = [
+                v for v in verification_result.verifications if not v.should_mark_complete
+            ]
 
             if completed:
                 f.write("✅ Verified and marked complete:\n\n")
@@ -1621,7 +1671,7 @@ def run_three_phase_iteration(
                 f.write("\n")
 
             if verification_result.commits_made:
-                f.write(f"📝 Commits created:\n")
+                f.write("📝 Commits created:\n")
                 for sha in verification_result.commits_made:
                     f.write(f"  {sha}\n")
 
@@ -1642,7 +1692,9 @@ def run_three_phase_iteration(
     last_commit_after = get_current_commit(project_path)
     has_new_commit = last_commit_after != last_commit_before
     has_agent_commits = agent_commits > 0
-    has_verified_work = verification_result.tasks_completed > 0 if 'verification_result' in locals() else False
+    has_verified_work = (
+        verification_result.tasks_completed > 0 if "verification_result" in locals() else False
+    )
 
     progress_made = has_new_commit or has_agent_commits or has_verified_work
 
@@ -1691,12 +1743,12 @@ def run_loop(
         in_progress_tasks = [t for t in task_details if t.status == "in_progress"]
 
         if in_progress_tasks:
-            safe_print(f"\nIn Progress:")
+            safe_print("\nIn Progress:")
             for task in in_progress_tasks[:3]:  # Show up to 3
                 safe_print(f"  - {task.task_id}: {task.title[:60]}")
 
         if pending_tasks:
-            safe_print(f"\nNext Pending Tasks:")
+            safe_print("\nNext Pending Tasks:")
             for task in pending_tasks[:3]:  # Show up to 3
                 safe_print(f"  - {task.task_id}: {task.title[:60]}")
 
@@ -1711,7 +1763,9 @@ def run_loop(
         # === Run iteration based on workflow mode ===
         if cfg.enable_three_phase_workflow:
             # 3-PHASE WORKFLOW
-            print(f"\n[Iteration {iteration}] Running 3-phase workflow (validate → implement → verify)...")
+            print(
+                f"\n[Iteration {iteration}] Running 3-phase workflow (validate → implement → verify)..."
+            )
 
             try:
                 progress_made, agent_commits = run_three_phase_iteration(
@@ -1725,15 +1779,17 @@ def run_loop(
                 )
 
                 if progress_made:
-                    print(f"\n[OK] Progress made in 3-phase workflow")
+                    print("\n[OK] Progress made in 3-phase workflow")
                     no_commit_streak = 0
                 else:
-                    print(f"\n[!]  No verified progress this iteration")
+                    print("\n[!]  No verified progress this iteration")
                     no_commit_streak += 1
                     print(f"     Circuit breaker streak: {no_commit_streak}/{cfg.no_commit_limit}")
 
                     if no_commit_streak >= cfg.no_commit_limit:
-                        print(f"\n[!]  No progress for {cfg.no_commit_limit} consecutive iterations. Stopping.")
+                        print(
+                            f"\n[!]  No progress for {cfg.no_commit_limit} consecutive iterations. Stopping."
+                        )
                         return
 
             except Exception as e:
@@ -1741,7 +1797,7 @@ def run_loop(
                 print(f"\n❌ Iteration failed: {e}")
                 no_commit_streak += 1
                 if no_commit_streak >= cfg.no_commit_limit:
-                    print(f"\n[!]  Too many failures. Stopping.")
+                    print("\n[!]  Too many failures. Stopping.")
                     return
 
         else:
@@ -1753,8 +1809,7 @@ def run_loop(
             # Build prompt with progress summary (no specific task assignment)
             progress_summary = f"{stats.done}/{stats.total} tasks complete ({stats.pending} pending, {stats.in_progress} in progress)"
             prompt = cfg.prompt_template.format(
-                spec_name=spec_name,
-                progress_summary=progress_summary
+                spec_name=spec_name, progress_summary=progress_summary
             )
 
             log_path = log_dir / cfg.log_file_template.format(index=iteration)
@@ -1785,13 +1840,13 @@ def run_loop(
                 if has_agent_commits:
                     print(f"[OK] Progress made (agents: {agent_commits} commit(s))")
                 elif has_worker_activity:
-                    print(f"[OK] Progress made (claude-flow workers active)")
+                    print("[OK] Progress made (claude-flow workers active)")
                 else:
-                    print(f"[OK] Progress made (new commit)")
+                    print("[OK] Progress made (new commit)")
                 no_commit_streak = 0
             else:
                 # No commits, no worker activity
-                print(f"[!]  No commits detected this iteration")
+                print("[!]  No commits detected this iteration")
                 print(f"     Circuit breaker streak: {no_commit_streak}/{cfg.no_commit_limit}")
 
             last_commit = new_last_commit

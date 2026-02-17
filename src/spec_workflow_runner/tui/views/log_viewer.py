@@ -85,6 +85,7 @@ class LogViewer:
             except OSError as exc:
                 # Log read error but continue
                 import logging
+
                 logging.warning(f"Failed to read log file {self.log_path}: {exc}")
                 return False
 

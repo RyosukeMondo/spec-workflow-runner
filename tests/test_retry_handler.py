@@ -2,11 +2,8 @@
 
 from __future__ import annotations
 
-import subprocess
-import time
-from datetime import datetime, timezone
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -240,12 +237,14 @@ class TestRetryHandler:
         # Mock subprocess that fails once, then succeeds
         mock_process = Mock()
         command_fn = Mock(return_value=mock_process)
-        monitor_fn = Mock(side_effect=[
-            (1, "First failure"),  # First attempt fails
-            (0, None),             # Second attempt succeeds
-        ])
+        monitor_fn = Mock(
+            side_effect=[
+                (1, "First failure"),  # First attempt fails
+                (0, None),  # Second attempt succeeds
+            ]
+        )
 
-        with patch('time.sleep'):  # Speed up test by skipping sleep
+        with patch("time.sleep"):  # Speed up test by skipping sleep
             success, result_ctx = handler.execute_with_retry(ctx, command_fn, monitor_fn)
 
         assert success is True
@@ -267,7 +266,7 @@ class TestRetryHandler:
         command_fn = Mock(return_value=mock_process)
         monitor_fn = Mock(return_value=(1, "Always fails"))
 
-        with patch('time.sleep'):  # Speed up test
+        with patch("time.sleep"):  # Speed up test
             success, result_ctx = handler.execute_with_retry(ctx, command_fn, monitor_fn)
 
         assert success is False
@@ -287,7 +286,7 @@ class TestRetryHandler:
         command_fn = Mock(side_effect=RuntimeError("Process failed"))
         monitor_fn = Mock()
 
-        with patch('time.sleep'):
+        with patch("time.sleep"):
             success, result_ctx = handler.execute_with_retry(ctx, command_fn, monitor_fn)
 
         assert success is False
@@ -310,6 +309,7 @@ class TestRetryHandler:
         assert log_file.exists()
 
         import json
+
         with open(log_file) as f:
             data = json.load(f)
 

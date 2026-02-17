@@ -16,8 +16,8 @@ def has_uncommitted_changes(project_path: Path) -> bool:
         cwd=project_path,
         capture_output=True,
         text=True,
-        encoding='utf-8',
-        errors='replace',
+        encoding="utf-8",
+        errors="replace",
     )
     return len(result.stdout.strip()) > 0
 
@@ -41,6 +41,7 @@ def run_commit_rescue(spec_name: str, project_path: Path) -> bool:
 # ============================================================================
 # INTEGRATION INTO YOUR EXISTING WORKFLOW
 # ============================================================================
+
 
 def enhanced_circuit_breaker_check(
     no_commit_streak: int,
@@ -111,6 +112,7 @@ def enhanced_circuit_breaker_check(
 # ============================================================================
 # EXAMPLE USAGE IN YOUR MONITORING LOOP
 # ============================================================================
+
 
 def example_monitoring_loop():
     """Example of how to integrate into your existing monitoring loop."""

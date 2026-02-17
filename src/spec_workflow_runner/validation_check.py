@@ -44,7 +44,9 @@ class ValidationResult:
         """Generate summary message."""
         if self.tasks_reset == 0:
             return f"✅ All {self.tasks_checked} completed tasks verified"
-        return f"🔄 Reset {self.tasks_reset}/{self.tasks_checked} tasks with missing implementations"
+        return (
+            f"🔄 Reset {self.tasks_reset}/{self.tasks_checked} tasks with missing implementations"
+        )
 
 
 def extract_files_from_task(task_text: str) -> list[str]:
@@ -307,7 +309,7 @@ def main() -> int:
     # Print details for invalid tasks
     invalid = [v for v in result.validations if not v.is_valid]
     if invalid:
-        print(f"\n❌ Invalid tasks reset to in-progress:\n")
+        print("\n❌ Invalid tasks reset to in-progress:\n")
         for task in invalid:
             print(f"  {task.task_id}: {task.title}")
             for issue in task.issues:

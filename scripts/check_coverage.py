@@ -15,13 +15,11 @@ Exit codes:
     2 - Coverage data not found or error
 """
 
-import json
 import sys
 from pathlib import Path
-from typing import Dict
 
 # Per-file minimum coverage requirements (percentage)
-FILE_THRESHOLDS: Dict[str, float] = {
+FILE_THRESHOLDS: dict[str, float] = {
     "src/spec_workflow_runner/tui/state.py": 90.0,
     "src/spec_workflow_runner/tui/runner_manager.py": 90.0,
 }
@@ -87,7 +85,7 @@ def check_thresholds(file_coverage: dict) -> bool:
 
         if coverage_pct is None:
             print(f"❌ {file_path}")
-            print(f"   ERROR: File not found in coverage data")
+            print("   ERROR: File not found in coverage data")
             all_passed = False
             continue
 
@@ -96,7 +94,7 @@ def check_thresholds(file_coverage: dict) -> bool:
         print(f"   Coverage: {coverage_pct:.2f}% (threshold: {threshold:.2f}%)")
 
         if coverage_pct < threshold:
-            print(f"   FAILED: Coverage below threshold")
+            print("   FAILED: Coverage below threshold")
             all_passed = False
 
     print()

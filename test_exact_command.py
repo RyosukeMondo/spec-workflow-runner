@@ -2,7 +2,6 @@
 """Test the exact command that spec-workflow-run uses."""
 
 import subprocess
-import time
 import threading
 from pathlib import Path
 
@@ -10,11 +9,13 @@ from pathlib import Path
 command_list = [
     "claude",
     "--print",
-    "--model", "sonnet",
+    "--model",
+    "sonnet",
     "--dangerously-skip-permissions",
-    "--output-format", "stream-json",
+    "--output-format",
+    "stream-json",
     "--verbose",
-    "[!] IMPORTANT: Test prompt"
+    "[!] IMPORTANT: Test prompt",
 ]
 
 # Format as string using Windows method
@@ -39,6 +40,7 @@ print(f"stdout: {proc.stdout}")
 # Exact read logic from run_tasks.py WITH file writing
 log_file = Path("test_output.log")
 
+
 def read_output():
     with log_file.open("w", encoding="utf-8") as handle:
         print("[DEBUG] Reader thread started")
@@ -59,6 +61,7 @@ def read_output():
             if line_count >= 3:
                 break
         print(f"[DEBUG] Reader finished. Got {line_count} lines")
+
 
 # Start reader thread
 thread = threading.Thread(target=read_output, daemon=True)

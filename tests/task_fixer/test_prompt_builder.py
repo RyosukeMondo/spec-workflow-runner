@@ -52,8 +52,13 @@ def _build(template_file: Path, *, malformed: str = MALFORMED, valid: bool = Fal
 class TestBuildPrompt:
     def test_contains_all_sections(self, template_file: Path) -> None:
         prompt = _build(template_file)
-        for section in ["# INSTRUCTIONS", "# TEMPLATE FORMAT", "# VALIDATION ISSUES",
-                        "# MALFORMED CONTENT", "# YOUR TASK"]:
+        for section in [
+            "# INSTRUCTIONS",
+            "# TEMPLATE FORMAT",
+            "# VALIDATION ISSUES",
+            "# MALFORMED CONTENT",
+            "# YOUR TASK",
+        ]:
             assert section in prompt
 
     def test_includes_template_and_malformed_content(self, template_file: Path) -> None:

@@ -60,7 +60,7 @@ def parse_tasks_file(file_path: Path) -> tuple[list[Task], list[str]]:
 
         current_task: Task | None = None
 
-        for line_num, line in enumerate(lines, start=1):
+        for _line_num, line in enumerate(lines, start=1):
             # Check for task header
             match = task_pattern.match(line)
             if match:
@@ -81,9 +81,7 @@ def parse_tasks_file(file_path: Path) -> tuple[list[Task], list[str]]:
                 else:  # space
                     status = TaskStatus.PENDING
 
-                current_task = Task(
-                    id=task_id, title=task_title, status=status, description=[]
-                )
+                current_task = Task(id=task_id, title=task_title, status=status, description=[])
 
             elif current_task and line.strip().startswith("-"):
                 # This is a description line for the current task

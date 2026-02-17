@@ -232,7 +232,9 @@ def _display_diff(diff_result, console: Console) -> None:
     )
 
 
-def _apply_fix_with_confirmation(fixer, tasks_file: Path, fixed_content: str, console: Console) -> int:
+def _apply_fix_with_confirmation(
+    fixer, tasks_file: Path, fixed_content: str, console: Console
+) -> int:
     """Apply the fix after user confirmation.
 
     Args:
@@ -257,11 +259,15 @@ def _apply_fix_with_confirmation(fixer, tasks_file: Path, fixed_content: str, co
         if write_result.success:
             console.print("[green]✓ File fixed successfully[/green]")
             console.print(f"[dim]Backup created at: {write_result.backup_path}[/dim]")
-            logger.info("Fix applied", extra={"extra_context": {"backup": str(write_result.backup_path)}})
+            logger.info(
+                "Fix applied", extra={"extra_context": {"backup": str(write_result.backup_path)}}
+            )
             return 0
         else:
             console.print(f"[red]Failed to write file: {write_result.error_message}[/red]")
-            logger.error("Write failed", extra={"extra_context": {"error": write_result.error_message}})
+            logger.error(
+                "Write failed", extra={"extra_context": {"error": write_result.error_message}}
+            )
             return 1
     except Exception as err:
         console.print(f"[red]Error applying fix: {err}[/red]")
@@ -286,7 +292,9 @@ def _handle_fix_command(spec_name: str, config_path: Path) -> int:
         logger.info("Config loaded", extra={"extra_context": {"spec_name": spec_name}})
     except Exception as err:
         console.print(f"[red]Error loading config: {err}[/red]")
-        logger.error("Config load failed", extra={"extra_context": {"error": str(err)}}, exc_info=True)
+        logger.error(
+            "Config load failed", extra={"extra_context": {"error": str(err)}}, exc_info=True
+        )
         return 1
 
     project_path = Path.cwd()

@@ -100,7 +100,10 @@ def render_tree(
     lines_rendered = 0
 
     # Create root tree with navigation hints
-    tree = Tree("📁 Projects [dim](↑/↓ j/k: move · Enter: select · Space: collapse · g/G: top/bottom · /: filter)[/dim]", guide_style="dim")
+    tree = Tree(
+        "📁 Projects [dim](↑/↓ j/k: move · Enter: select · Space: collapse · g/G: top/bottom · /: filter)[/dim]",
+        guide_style="dim",
+    )
 
     # Add scroll indicator at top if needed
     if viewport_offset > 0:
@@ -115,8 +118,7 @@ def render_tree(
         if not _matches_filter(project.name, filter_text):
             # Check if any specs match before skipping project
             matching_specs = [
-                spec for spec in project.specs
-                if _matches_filter(spec.name, filter_text)
+                spec for spec in project.specs if _matches_filter(spec.name, filter_text)
             ]
             if not matching_specs:
                 continue
@@ -136,11 +138,12 @@ def render_tree(
         total_lines += 1
 
         # Check if this line is in viewport
-        in_viewport = (current_line >= viewport_offset and
-                      (viewport_limit is None or lines_rendered < viewport_limit))
+        in_viewport = current_line >= viewport_offset and (
+            viewport_limit is None or lines_rendered < viewport_limit
+        )
 
         # Build project label with collapse indicator
-        spec_count = len(visible_specs)
+        len(visible_specs)
         total_specs = len(project.specs)
         completed_specs = sum(1 for s in project.specs if s.is_complete)
         is_collapsed = _project_idx in collapsed_projects
@@ -178,8 +181,9 @@ def render_tree(
                 total_lines += 1
 
                 # Check if this line is in viewport
-                spec_in_viewport = (current_line >= viewport_offset and
-                                   (viewport_limit is None or lines_rendered < viewport_limit))
+                spec_in_viewport = current_line >= viewport_offset and (
+                    viewport_limit is None or lines_rendered < viewport_limit
+                )
 
                 # Get status badge
                 badge_emoji, badge_color = _get_status_badge(spec)
@@ -201,9 +205,7 @@ def render_tree(
                 spec_label = " ".join(spec_label_parts)
 
                 # Highlight if selected
-                is_selected_spec = (
-                    is_selected_project and selected_spec_index == visible_spec_idx
-                )
+                is_selected_spec = is_selected_project and selected_spec_index == visible_spec_idx
                 if is_selected_spec:
                     spec_label = f"[reverse]{spec_label}[/reverse]"
 
@@ -218,7 +220,9 @@ def render_tree(
         visible_project_idx += 1
 
     # Add scroll indicator at bottom if needed
-    hidden_below = total_lines - (viewport_offset + lines_rendered - (1 if viewport_offset > 0 else 0))
+    hidden_below = total_lines - (
+        viewport_offset + lines_rendered - (1 if viewport_offset > 0 else 0)
+    )
     if viewport_limit is not None and hidden_below > 0:
         tree.add(f"[dim]↓ {hidden_below} more below[/dim]")
 

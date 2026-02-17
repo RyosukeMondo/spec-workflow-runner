@@ -10,10 +10,11 @@ import json
 import logging
 import subprocess
 import time
+from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +64,7 @@ class RetryContext:
     spec_name: str
     project_path: Path
     attempts: list[RetryAttempt] = field(default_factory=list)
-    start_time: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+    start_time: datetime = field(default_factory=lambda: datetime.now(UTC))
 
     @property
     def attempt_count(self) -> int:
@@ -73,7 +74,7 @@ class RetryContext:
     @property
     def total_duration_seconds(self) -> float:
         """Get total duration across all attempts."""
-        return (datetime.now(timezone.utc) - self.start_time).total_seconds()
+        return (datetime.now(UTC) - self.start_time).total_seconds()
 
     def add_attempt(
         self,
@@ -84,7 +85,7 @@ class RetryContext:
         """Record a retry attempt."""
         attempt = RetryAttempt(
             attempt_number=self.attempt_count + 1,
-            timestamp=datetime.now(timezone.utc).isoformat(),
+            timestamp=datetime.now(UTC).isoformat(),
             exit_code=exit_code,
             error_message=error_message,
             duration_seconds=duration,
@@ -168,8 +169,7 @@ class RetryHandler:
         # Check if max retries exceeded
         if context.attempt_count >= self.config.max_retries:
             logger.warning(
-                f"Max retries ({self.config.max_retries}) exceeded for "
-                f"runner {context.runner_id}"
+                f"Max retries ({self.config.max_retries}) exceeded for runner {context.runner_id}"
             )
             return False
 
@@ -229,9 +229,7 @@ class RetryHandler:
 
                 # Check if should retry
                 if not self._should_retry(context, exit_code):
-                    logger.error(
-                        f"Runner {context.runner_id} failed after {attempt} attempts"
-                    )
+                    logger.error(f"Runner {context.runner_id} failed after {attempt} attempts")
                     self._log_retry_context(context)
                     return False, context
 
@@ -255,17 +253,14 @@ class RetryHandler:
                 # Check if should retry
                 if not self._should_retry(context, None):
                     logger.error(
-                        f"Runner {context.runner_id} failed with exception "
-                        f"after {attempt} attempts"
+                        f"Runner {context.runner_id} failed with exception after {attempt} attempts"
                     )
                     self._log_retry_context(context)
                     return False, context
 
                 # Calculate backoff and retry
                 backoff = self._calculate_backoff(attempt)
-                logger.warning(
-                    f"Runner {context.runner_id} crashed, retrying in {backoff:.1f}s..."
-                )
+                logger.warning(f"Runner {context.runner_id} crashed, retrying in {backoff:.1f}s...")
                 time.sleep(backoff)
 
 

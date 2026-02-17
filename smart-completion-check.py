@@ -20,7 +20,7 @@ def safe_print(text: str):
     try:
         print(text)
     except UnicodeEncodeError:
-        print(text.encode('ascii', errors='replace').decode('ascii'))
+        print(text.encode("ascii", errors="replace").decode("ascii"))
 
 
 def get_new_commits_count(project_path: Path, baseline_commit: str) -> int:
@@ -73,7 +73,7 @@ def check_uncommitted_changes(project_path: Path) -> dict:
         if status_result.returncode != 0:
             return {"has_changes": False, "changed_files": [], "staged_files": []}
 
-        lines = status_result.stdout.strip().split('\n')
+        lines = status_result.stdout.strip().split("\n")
         changed_files = []
         staged_files = []
 
@@ -84,7 +84,7 @@ def check_uncommitted_changes(project_path: Path) -> dict:
             file_path = line[3:]
 
             # Staged changes (first char is not space/?)
-            if status_code[0] not in (' ', '?'):
+            if status_code[0] not in (" ", "?"):
                 staged_files.append(file_path)
 
             # Any change
@@ -136,7 +136,8 @@ RESPOND WITH ONLY THE JSON OBJECT. No other text."""
             [
                 "claude",
                 "--print",
-                "--model", "sonnet",
+                "--model",
+                "sonnet",
                 "--dangerously-skip-permissions",
                 "--continue",
                 probe_prompt,
@@ -144,8 +145,8 @@ RESPOND WITH ONLY THE JSON OBJECT. No other text."""
             cwd=project_path,
             capture_output=True,
             text=True,
-            encoding='utf-8',
-            errors='replace',
+            encoding="utf-8",
+            errors="replace",
             timeout=60,
         )
 
@@ -153,7 +154,8 @@ RESPOND WITH ONLY THE JSON OBJECT. No other text."""
 
         # Extract JSON (might be wrapped in markdown)
         import re
-        json_match = re.search(r'```json\s*(\{.*?\})\s*```', output, re.DOTALL)
+
+        json_match = re.search(r"```json\s*(\{.*?\})\s*```", output, re.DOTALL)
         if json_match:
             json_str = json_match.group(1)
         else:
@@ -299,7 +301,9 @@ def smart_completion_check(
             changes = check_uncommitted_changes(project_path)
 
             if changes["has_changes"]:
-                safe_print(f"\n[!] Status: complete but {len(changes['changed_files'])} files changed")
+                safe_print(
+                    f"\n[!] Status: complete but {len(changes['changed_files'])} files changed"
+                )
                 safe_print("Running commit rescue...")
 
                 if run_commit_rescue(project_path, spec_name):

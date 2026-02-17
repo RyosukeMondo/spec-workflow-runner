@@ -48,16 +48,9 @@ def render_status_panel(spec: SpecState | None, project_path: str | None = None)
     # Handle no spec selected
     if spec is None:
         content = Text(
-            "Select a spec from the tree to view details",
-            justify="center",
-            style="dim italic"
+            "Select a spec from the tree to view details", justify="center", style="dim italic"
         )
-        return Panel(
-            content,
-            title="Status",
-            border_style="dim",
-            padding=(1, 2)
-        )
+        return Panel(content, title="Status", border_style="dim", padding=(1, 2))
 
     # Build metadata table
     metadata_table = Table.grid(padding=(0, 2))
@@ -80,9 +73,7 @@ def render_status_panel(spec: SpecState | None, project_path: str | None = None)
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
     )
     progress.add_task(
-        "",
-        total=spec.total_tasks if spec.total_tasks > 0 else 1,
-        completed=spec.completed_tasks
+        "", total=spec.total_tasks if spec.total_tasks > 0 else 1, completed=spec.completed_tasks
     )
 
     # Build content list
@@ -99,10 +90,7 @@ def render_status_panel(spec: SpecState | None, project_path: str | None = None)
         runner_table.add_column()
 
         # Provider and model
-        runner_table.add_row(
-            "Provider/Model:",
-            f"{spec.runner.provider} - {spec.runner.model}"
-        )
+        runner_table.add_row("Provider/Model:", f"{spec.runner.provider} - {spec.runner.model}")
 
         # Running duration
         duration = _format_duration(spec.runner.started_at)
@@ -113,28 +101,23 @@ def render_status_panel(spec: SpecState | None, project_path: str | None = None)
 
         # Last commit if available
         if spec.runner.last_commit_hash and spec.runner.last_commit_message:
-            commit_info = (
-                f"{spec.runner.last_commit_hash[:7]} - "
-                f"{spec.runner.last_commit_message}"
-            )
+            commit_info = f"{spec.runner.last_commit_hash[:7]} - {spec.runner.last_commit_message}"
             runner_table.add_row("Last Commit:", commit_info)
 
         content_items.append(runner_table)
 
     # Combine all content into a single renderable group
     from rich.console import Group
+
     content = Group(*content_items)
 
     # Determine border color based on completion status
     border_style = "green" if spec.is_complete else "yellow"
 
     # Build title with runner control hints
-    hints = "[dim](p: provider · m: model · s: start · x: stop · r: restart · X: cleanup dead)[/dim]"
+    hints = (
+        "[dim](p: provider · m: model · s: start · x: stop · r: restart · X: cleanup dead)[/dim]"
+    )
     title_text = f"[bold]{spec.name}[/bold] {hints}"
 
-    return Panel(
-        content,
-        title=title_text,
-        border_style=border_style,
-        padding=(1, 2)
-    )
+    return Panel(content, title=title_text, border_style=border_style, padding=(1, 2))

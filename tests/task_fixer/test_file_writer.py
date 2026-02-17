@@ -2,11 +2,9 @@
 
 from __future__ import annotations
 
-import os
-import stat
 from pathlib import Path
 from tempfile import TemporaryDirectory
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
 
@@ -108,9 +106,7 @@ def test_multiple_backups_get_unique_names(
     assert str(third_backup).endswith(".backup.2")
 
 
-def test_atomic_write_uses_temp_file(
-    file_writer: FileWriter, temp_dir: TemporaryDirectory
-) -> None:
+def test_atomic_write_uses_temp_file(file_writer: FileWriter, temp_dir: TemporaryDirectory) -> None:
     """Test that write uses atomic temp file pattern."""
     test_file = Path(temp_dir.name) / "atomic.md"
     content = "Atomic content\n"
@@ -126,9 +122,7 @@ def test_atomic_write_uses_temp_file(
     assert len(temp_files) == 0
 
 
-def test_creates_parent_directories(
-    file_writer: FileWriter, temp_dir: TemporaryDirectory
-) -> None:
+def test_creates_parent_directories(file_writer: FileWriter, temp_dir: TemporaryDirectory) -> None:
     """Test that parent directories are created if they don't exist."""
     test_file = Path(temp_dir.name) / "subdir" / "nested" / "file.md"
     content = "Nested content\n"
@@ -140,9 +134,7 @@ def test_creates_parent_directories(
     assert test_file.read_text(encoding="utf-8") == content
 
 
-def test_restore_from_backup_success(
-    file_writer: FileWriter, temp_dir: TemporaryDirectory
-) -> None:
+def test_restore_from_backup_success(file_writer: FileWriter, temp_dir: TemporaryDirectory) -> None:
     """Test successful restore from backup."""
     test_file = Path(temp_dir.name) / "test.md"
     original_content = "Original\n"
@@ -179,9 +171,7 @@ def test_restore_from_nonexistent_backup(
     assert not success
 
 
-def test_write_handles_unicode(
-    file_writer: FileWriter, temp_dir: TemporaryDirectory
-) -> None:
+def test_write_handles_unicode(file_writer: FileWriter, temp_dir: TemporaryDirectory) -> None:
     """Test writing unicode content."""
     test_file = Path(temp_dir.name) / "unicode.md"
     content = "Hello 世界 🌍\n"
@@ -233,7 +223,7 @@ def test_temp_file_write_error_handling(
 
     # Mock the open call to raise an error during write
     with patch("builtins.open") as mock_open:
-        mock_open.side_effect = IOError("Disk full")
+        mock_open.side_effect = OSError("Disk full")
 
         result = file_writer.write_with_backup(test_file, "Content\n")
 
@@ -242,9 +232,7 @@ def test_temp_file_write_error_handling(
         assert "Failed to write file" in result.error_message or "Disk full" in result.error_message
 
 
-def test_restore_error_handling(
-    file_writer: FileWriter, temp_dir: TemporaryDirectory
-) -> None:
+def test_restore_error_handling(file_writer: FileWriter, temp_dir: TemporaryDirectory) -> None:
     """Test restore error handling."""
     backup_path = Path(temp_dir.name) / "backup.md"
     test_file = Path(temp_dir.name) / "test.md"
@@ -270,7 +258,7 @@ def test_write_preserves_file_permissions(
 
     # Set specific permissions
     test_file.chmod(0o644)
-    original_mode = test_file.stat().st_mode
+    test_file.stat().st_mode
 
     result = file_writer.write_with_backup(test_file, "New\n")
 
@@ -317,9 +305,7 @@ def test_empty_content(file_writer: FileWriter, temp_dir: TemporaryDirectory) ->
     assert test_file.read_text(encoding="utf-8") == ""
 
 
-def test_very_large_content(
-    file_writer: FileWriter, temp_dir: TemporaryDirectory
-) -> None:
+def test_very_large_content(file_writer: FileWriter, temp_dir: TemporaryDirectory) -> None:
     """Test writing very large content."""
     test_file = Path(temp_dir.name) / "large.md"
     # Create 1MB of content

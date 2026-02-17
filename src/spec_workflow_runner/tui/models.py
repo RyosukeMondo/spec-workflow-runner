@@ -194,10 +194,7 @@ class AppState:
         return None
 
     def __repr__(self) -> str:
-        return (
-            f"AppState(projects={len(self.projects)}, "
-            f"active_runners={len(self.active_runners)})"
-        )
+        return f"AppState(projects={len(self.projects)}, active_runners={len(self.active_runners)})"
 
 
 @dataclass

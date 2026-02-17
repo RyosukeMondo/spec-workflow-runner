@@ -56,7 +56,6 @@ class RunnerManager:
 
     def _restore_runners(self) -> None:
         """Restore runner states from disk and validate PIDs."""
-        import os
 
         restored = self.persister.load()
         for runner in restored:
@@ -210,7 +209,9 @@ class RunnerManager:
             started_at=datetime.now(),
             baseline_commit=baseline_commit,
             retry_count=0,
-            max_retries=self.config.retry_config.max_retries if self.config.retry_config.retry_on_crash else 0,
+            max_retries=self.config.retry_config.max_retries
+            if self.config.retry_config.retry_on_crash
+            else 0,
         )
 
         # Store runner, process, and log file
@@ -306,7 +307,7 @@ class RunnerManager:
         except subprocess.TimeoutExpired:
             # Process didn't terminate, escalate to SIGKILL
             logger.warning(
-                f"Process {runner.pid} did not terminate after {timeout}s, " f"sending SIGKILL"
+                f"Process {runner.pid} did not terminate after {timeout}s, sending SIGKILL"
             )
             process.kill()
             exit_code = process.wait()
@@ -538,14 +539,13 @@ class RunnerManager:
         # Check if max retries exceeded
         if runner.retry_count >= runner.max_retries:
             logger.info(
-                f"Max retries ({runner.max_retries}) reached for runner {runner_id}, "
-                f"not retrying"
+                f"Max retries ({runner.max_retries}) reached for runner {runner_id}, not retrying"
             )
             return False
 
         # Calculate backoff delay
         backoff_seconds = self.config.retry_config.retry_backoff_seconds * (
-            self.config.retry_config.backoff_multiplier ** runner.retry_count
+            self.config.retry_config.backoff_multiplier**runner.retry_count
         )
         backoff_seconds = min(
             backoff_seconds,
@@ -599,9 +599,7 @@ class RunnerManager:
 
             # Prepare log file for retry
             log_dir = (
-                runner.project_path
-                / self.config.spec_workflow_dir_name
-                / self.config.log_dir_name
+                runner.project_path / self.config.spec_workflow_dir_name / self.config.log_dir_name
             )
             timestamp = time.strftime("%Y%m%d_%H%M%S")
             log_filename = self.config.log_file_template.format(

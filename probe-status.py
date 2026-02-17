@@ -15,7 +15,7 @@ def safe_print(text: str):
     try:
         print(text)
     except UnicodeEncodeError:
-        print(text.encode('ascii', errors='replace').decode('ascii'))
+        print(text.encode("ascii", errors="replace").decode("ascii"))
 
 
 def probe_session_status(project_path: Path) -> dict:
@@ -63,7 +63,8 @@ RESPOND WITH ONLY THE JSON OBJECT. No other text."""
             [
                 "claude",
                 "--print",
-                "--model", "sonnet",
+                "--model",
+                "sonnet",
                 "--dangerously-skip-permissions",
                 "--continue",  # KEY: Resume session
                 probe_prompt,
@@ -71,8 +72,8 @@ RESPOND WITH ONLY THE JSON OBJECT. No other text."""
             cwd=project_path,
             capture_output=True,
             text=True,
-            encoding='utf-8',
-            errors='replace',
+            encoding="utf-8",
+            errors="replace",
             timeout=60,  # Quick probe
         )
 
@@ -81,7 +82,8 @@ RESPOND WITH ONLY THE JSON OBJECT. No other text."""
 
         # Extract JSON (might be wrapped in markdown)
         import re
-        json_match = re.search(r'```json\s*(\{.*?\})\s*```', output, re.DOTALL)
+
+        json_match = re.search(r"```json\s*(\{.*?\})\s*```", output, re.DOTALL)
         if json_match:
             json_str = json_match.group(1)
         else:

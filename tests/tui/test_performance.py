@@ -275,7 +275,9 @@ class TestConcurrentRunners:
 
         # Performance assertions
         assert elapsed_ms < 1000, f"Starting 5 runners took {elapsed_ms:.1f}ms, expected < 1s"
-        assert stop_elapsed_ms < 2000, f"Stopping 5 runners took {stop_elapsed_ms:.1f}ms, expected < 2s"
+        assert stop_elapsed_ms < 2000, (
+            f"Stopping 5 runners took {stop_elapsed_ms:.1f}ms, expected < 2s"
+        )
 
 
 class TestPollingOverhead:
@@ -378,7 +380,7 @@ class TestPollingOverhead:
             runner=None,
         )
 
-        project_state = ProjectState(
+        ProjectState(
             path=project_path,
             name=project_path.name,
             specs=[spec_state],
@@ -399,7 +401,7 @@ class TestPollingOverhead:
 
         # First poll should detect initial state
         poller._poll_cycle()
-        initial_updates = update_queue.qsize()
+        update_queue.qsize()
 
         # Clear queue
         while not update_queue.empty():

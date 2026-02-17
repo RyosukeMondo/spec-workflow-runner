@@ -135,7 +135,9 @@ def test_fix_tasks_file_read_error(
 
     invalid_result = ValidationResult(
         is_valid=False,
-        issues=(ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),),
+        issues=(
+            ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),
+        ),
     )
     mock_validator.validate_file.return_value = invalid_result
 
@@ -164,7 +166,9 @@ def test_fix_tasks_file_prompt_build_error(
 
     invalid_result = ValidationResult(
         is_valid=False,
-        issues=(ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),),
+        issues=(
+            ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),
+        ),
     )
     mock_validator.validate_file.return_value = invalid_result
     mock_prompt_builder.build_prompt.side_effect = ValueError("Template not found")
@@ -193,7 +197,9 @@ def test_fix_tasks_file_claude_command_failure(
 
     invalid_result = ValidationResult(
         is_valid=False,
-        issues=(ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),),
+        issues=(
+            ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),
+        ),
     )
     mock_validator.validate_file.return_value = invalid_result
 
@@ -227,7 +233,9 @@ def test_fix_tasks_file_claude_timeout(
 
     invalid_result = ValidationResult(
         is_valid=False,
-        issues=(ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),),
+        issues=(
+            ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),
+        ),
     )
     mock_validator.validate_file.return_value = invalid_result
 
@@ -260,7 +268,9 @@ def test_fix_tasks_file_claude_execution_error(
 
     invalid_result = ValidationResult(
         is_valid=False,
-        issues=(ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),),
+        issues=(
+            ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),
+        ),
     )
     mock_validator.validate_file.return_value = invalid_result
 
@@ -291,7 +301,9 @@ def test_fix_tasks_file_validation_error(
 
     invalid_result = ValidationResult(
         is_valid=False,
-        issues=(ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),),
+        issues=(
+            ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),
+        ),
     )
 
     # First call returns invalid, second call raises error
@@ -336,7 +348,9 @@ def test_fix_tasks_file_success_flow(
     # Setup validation results
     invalid_result = ValidationResult(
         is_valid=False,
-        issues=(ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),),
+        issues=(
+            ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),
+        ),
     )
 
     valid_result = ValidationResult(
@@ -393,7 +407,9 @@ def test_fix_tasks_file_prompt_context_structure(
 
     invalid_result = ValidationResult(
         is_valid=False,
-        issues=(ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),),
+        issues=(
+            ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),
+        ),
     )
     mock_validator.validate_file.return_value = invalid_result
 
@@ -429,7 +445,9 @@ def test_fix_tasks_file_temp_file_cleanup(
 
     invalid_result = ValidationResult(
         is_valid=False,
-        issues=(ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),),
+        issues=(
+            ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),
+        ),
     )
 
     valid_result = ValidationResult(
@@ -479,7 +497,9 @@ def test_fix_tasks_file_subprocess_timeout_value(
 
     invalid_result = ValidationResult(
         is_valid=False,
-        issues=(ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),),
+        issues=(
+            ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),
+        ),
     )
     mock_validator.validate_file.return_value = invalid_result
 
@@ -585,7 +605,9 @@ def test_dependency_injection_all_components_used(
 
     invalid_result = ValidationResult(
         is_valid=False,
-        issues=(ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),),
+        issues=(
+            ValidationIssue(IssueType.MISSING_CHECKBOX, 1, "- Broken task", "Missing checkbox"),
+        ),
     )
 
     valid_result = ValidationResult(

@@ -597,7 +597,7 @@ class TestCompleteWorkflow:
 
                 # Navigate to spec
                 app.keybinding_handler.handle_key("down")  # Select project
-                app.keybinding_handler.handle_key(" ")     # Expand project (collapsed by default)
+                app.keybinding_handler.handle_key(" ")  # Expand project (collapsed by default)
                 app.keybinding_handler.handle_key("down")  # Select spec
 
                 # Verify selection

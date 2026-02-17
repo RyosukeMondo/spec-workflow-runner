@@ -118,8 +118,8 @@ def run_command(
             check=check,
             capture_output=True,
             text=True,
-            encoding='utf-8',
-            errors='replace',
+            encoding="utf-8",
+            errors="replace",
             shell=True,
             env=env,
         )
@@ -132,8 +132,8 @@ def run_command(
             check=check,
             capture_output=True,
             text=True,
-            encoding='utf-8',
-            errors='replace',
+            encoding="utf-8",
+            errors="replace",
             shell=False,
             env=env,
         )
@@ -194,8 +194,8 @@ def popen_command(
             shell=True,
             env=env,
             text=text_mode,
-            encoding='utf-8' if text_mode else None,
-            errors='replace' if text_mode else None,
+            encoding="utf-8" if text_mode else None,
+            errors="replace" if text_mode else None,
         )
     else:
         # On Linux/macOS, use command list with shell=False for security
@@ -209,8 +209,8 @@ def popen_command(
             shell=False,
             env=env,
             text=text_mode,
-            encoding='utf-8' if text_mode else None,
-            errors='replace' if text_mode else None,
+            encoding="utf-8" if text_mode else None,
+            errors="replace" if text_mode else None,
         )
 
 
@@ -300,9 +300,7 @@ def safe_terminate_process(process: subprocess.Popen[Any], timeout: int = 5) -> 
         process.terminate()
         process.wait(timeout=timeout)
     except subprocess.TimeoutExpired:
-        logger.warning(
-            f"Process {process.pid} did not terminate gracefully, forcing kill"
-        )
+        logger.warning(f"Process {process.pid} did not terminate gracefully, forcing kill")
         try:
             process.kill()
             process.wait(timeout=2)

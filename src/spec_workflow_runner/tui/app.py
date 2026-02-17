@@ -190,8 +190,7 @@ class TUIApp:
             update: State update to process
         """
         logger.debug(
-            f"State update: project={update.project}, spec={update.spec}, "
-            f"type={update.update_type}"
+            f"State update: project={update.project}, spec={update.spec}, type={update.update_type}"
         )
 
         if update.update_type == "runner_state":
@@ -268,7 +267,7 @@ class TUIApp:
                     return line_index - 1  # Return project line
                 # Count to selected spec
                 spec_count = 0
-                for spec in visible_specs:
+                for _spec in visible_specs:
                     if spec_count == self.app_state.selected_spec_index:
                         return line_index
                     line_index += 1
@@ -571,8 +570,7 @@ class TUIApp:
                             self.app_state.current_error = None
                             self.app_state.mark_dirty()
                         # Mark dirty if terminal size changed
-                        if (self.terminal_width != prev_width or
-                            self.terminal_height != prev_height):
+                        if self.terminal_width != prev_width or self.terminal_height != prev_height:
                             self.app_state.mark_dirty()
 
                     # Poll for keyboard input
@@ -692,7 +690,7 @@ class TUIApp:
 
             logger.error(f"TUI crashed: {err}", exc_info=True)
             self.console.print(f"[red]Error: {err}[/red]")
-            self.console.print(f"[dim]Full logs at: ~/.cache/spec-workflow-runner/tui.log[/dim]")
+            self.console.print("[dim]Full logs at: ~/.cache/spec-workflow-runner/tui.log[/dim]")
             self.console.print("\n[yellow]Traceback:[/yellow]")
             self.console.print(traceback.format_exc())
             return 1

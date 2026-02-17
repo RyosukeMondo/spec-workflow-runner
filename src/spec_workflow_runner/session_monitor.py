@@ -47,10 +47,7 @@ def get_latest_session_file(sessions_dir: Path) -> Path | None:
         return None
 
     # Find all .jsonl files (excluding sessions-index.json)
-    session_files = [
-        f for f in sessions_dir.glob("*.jsonl")
-        if f.name != "sessions-index.json"
-    ]
+    session_files = [f for f in sessions_dir.glob("*.jsonl") if f.name != "sessions-index.json"]
 
     if not session_files:
         return None
@@ -108,7 +105,7 @@ def format_session_update(line: str) -> str | None:
 
         elif msg_type == "tool_result":
             # Show tool results
-            tool_use_id = data.get("toolUseId", "")
+            data.get("toolUseId", "")
             return f"[{time_str}] ✅ Tool completed"
 
     except (json.JSONDecodeError, KeyError, AttributeError):

@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
-
 from spec_workflow_runner.utils import is_context_limit_error, is_rate_limit_error
 
 

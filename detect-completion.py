@@ -7,7 +7,6 @@ This script uses multiple signals to robustly detect completion.
 
 import re
 from pathlib import Path
-from typing import Optional
 
 
 def safe_print(text: str):
@@ -15,7 +14,7 @@ def safe_print(text: str):
     try:
         print(text)
     except UnicodeEncodeError:
-        print(text.encode('ascii', errors='replace').decode('ascii'))
+        print(text.encode("ascii", errors="replace").decode("ascii"))
 
 
 def parse_last_message(log_file: Path) -> str:
@@ -25,18 +24,18 @@ def parse_last_message(log_file: Path) -> str:
         Last message text, or empty string if not found
     """
     try:
-        with open(log_file, 'r', encoding='utf-8', errors='replace') as f:
+        with open(log_file, encoding="utf-8", errors="replace") as f:
             content = f.read()
 
         # Look for last message before session end
         # Pattern: "[Result: ...]" at the end
-        match = re.search(r'\[Result: (.*?)\](?:\s*Saved log:)?', content, re.DOTALL)
+        match = re.search(r"\[Result: (.*?)\](?:\s*Saved log:)?", content, re.DOTALL)
         if match:
             return match.group(1).strip()
 
         # Fallback: last few lines
-        lines = content.strip().split('\n')
-        return '\n'.join(lines[-10:]) if lines else ""
+        lines = content.strip().split("\n")
+        return "\n".join(lines[-10:]) if lines else ""
 
     except Exception as e:
         safe_print(f"Error reading log: {e}")
@@ -320,4 +319,5 @@ def main():
 
 if __name__ == "__main__":
     import sys
+
     sys.exit(main())

@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
 
 from spec_workflow_runner.tui.app import TUIApp
-from spec_workflow_runner.tui.models import AppState, ProjectState, SpecState
 from spec_workflow_runner.utils import Config
 
 
@@ -153,7 +151,6 @@ class TestLayoutBuilding:
             patch("spec_workflow_runner.tui.app.discover_specs") as mock_discover_specs,
             patch("spec_workflow_runner.tui.app.read_task_stats") as mock_read_stats,
         ):
-
             mock_discover_proj.return_value = [project_dir]
             mock_discover_specs.return_value = [("test-spec", spec_dir)]
 
@@ -216,7 +213,7 @@ class TestHelpPanelRaceCondition:
         tui_app.app_state.projects = []
 
         # Build layout (no help panel)
-        layout1 = tui_app._build_layout()
+        tui_app._build_layout()
 
         # Simulate keyboard input toggling help visibility
         # (this is what happens when user presses '?')
@@ -260,7 +257,6 @@ class TestStatusMessageFlow:
 
     def test_status_message_set_on_key_press(self, tui_app):
         """Test that status message is set when unassigned key is pressed."""
-        from datetime import datetime
 
         # Simulate pressing an unassigned key
         handled, message = tui_app.keybinding_handler.handle_key("z")

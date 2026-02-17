@@ -5,11 +5,9 @@ When the circuit breaker detects no commits but uncommitted changes exist,
 this script invokes a special "rescue" prompt to commit the work properly.
 """
 
-import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
 
 
 def safe_print(text: str):
@@ -17,7 +15,7 @@ def safe_print(text: str):
     try:
         print(text)
     except UnicodeEncodeError:
-        print(text.encode('ascii', errors='replace').decode('ascii'))
+        print(text.encode("ascii", errors="replace").decode("ascii"))
 
 
 def has_uncommitted_changes() -> tuple[bool, str]:
@@ -30,8 +28,8 @@ def has_uncommitted_changes() -> tuple[bool, str]:
         ["git", "status", "--porcelain"],
         capture_output=True,
         text=True,
-        encoding='utf-8',
-        errors='replace',
+        encoding="utf-8",
+        errors="replace",
     )
 
     output = result.stdout.strip()
@@ -46,12 +44,12 @@ def get_changed_files() -> list[str]:
         ["git", "status", "--porcelain"],
         capture_output=True,
         text=True,
-        encoding='utf-8',
-        errors='replace',
+        encoding="utf-8",
+        errors="replace",
     )
 
     files = []
-    for line in result.stdout.strip().split('\n'):
+    for line in result.stdout.strip().split("\n"):
         if line:
             # Format: "?? file.txt" or " M file.txt"
             parts = line.split(maxsplit=1)
@@ -68,8 +66,8 @@ def get_diff_summary() -> str:
         ["git", "diff", "--stat"],
         capture_output=True,
         text=True,
-        encoding='utf-8',
-        errors='replace',
+        encoding="utf-8",
+        errors="replace",
     )
 
     diff_stat = result.stdout.strip()
@@ -79,8 +77,8 @@ def get_diff_summary() -> str:
         ["git", "ls-files", "--others", "--exclude-standard"],
         capture_output=True,
         text=True,
-        encoding='utf-8',
-        errors='replace',
+        encoding="utf-8",
+        errors="replace",
     )
 
     untracked = result.stdout.strip()
@@ -137,7 +135,7 @@ The circuit breaker was about to trigger, but we're giving you a chance to rescu
 Analyze the uncommitted changes and create proper atomic commits.
 
 ## Changed Files
-{chr(10).join(f'- {f}' for f in changed_files)}
+{chr(10).join(f"- {f}" for f in changed_files)}
 
 ## Diff Summary
 {diff_summary}
@@ -188,17 +186,19 @@ START RESCUE NOW.
             [
                 "claude",
                 "--print",
-                "--model", "sonnet",
+                "--model",
+                "sonnet",
                 "--dangerously-skip-permissions",
-                "--output-format", "stream-json",
+                "--output-format",
+                "stream-json",
                 "--verbose",
                 rescue_prompt,
             ],
             cwd=project_path,
             capture_output=True,
             text=True,
-            encoding='utf-8',
-            errors='replace',
+            encoding="utf-8",
+            errors="replace",
             timeout=300,  # 5 minute timeout
         )
 
@@ -225,8 +225,8 @@ START RESCUE NOW.
                 ["git", "status", "--short"],
                 capture_output=True,
                 text=True,
-                encoding='utf-8',
-                errors='replace',
+                encoding="utf-8",
+                errors="replace",
             )
             safe_print(result.stdout)
             return False
@@ -241,6 +241,7 @@ START RESCUE NOW.
         safe_print(f"❌ RESCUE FAILED - Exception: {e}")
         safe_print("=" * 80)
         import traceback
+
         traceback.print_exc()
         return False
 

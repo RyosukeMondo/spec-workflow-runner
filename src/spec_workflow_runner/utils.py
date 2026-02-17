@@ -5,7 +5,6 @@ from __future__ import annotations
 import json
 import os
 import re
-import subprocess
 import time
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
@@ -189,7 +188,9 @@ def reduce_spec_context(project_path: Path, spec_name: str, cfg: Config) -> bool
 
     existing_patterns = set()
     if claudeignore_path.exists():
-        existing_patterns = set(line.strip() for line in claudeignore_path.read_text().splitlines() if line.strip())
+        existing_patterns = set(
+            line.strip() for line in claudeignore_path.read_text().splitlines() if line.strip()
+        )
 
     new_patterns = ignore_patterns - existing_patterns
     if new_patterns:
@@ -259,7 +260,9 @@ def _install_mcp_server(provider: Provider, project_path: Path, cfg: Config) -> 
                 f"   Error: {result.stderr.strip()}"
             )
 
-        print(f"[OK] spec-workflow MCP server installed successfully for {provider.get_provider_name()}")
+        print(
+            f"[OK] spec-workflow MCP server installed successfully for {provider.get_provider_name()}"
+        )
         logger.info("MCP server installation completed successfully")
 
     except Exception as err:
@@ -463,13 +466,9 @@ class Config:
         if tui_log_tail_lines <= 0:
             raise ValueError(f"tui_log_tail_lines must be positive, got {tui_log_tail_lines}")
         if tui_min_terminal_cols <= 0:
-            raise ValueError(
-                f"tui_min_terminal_cols must be positive, got {tui_min_terminal_cols}"
-            )
+            raise ValueError(f"tui_min_terminal_cols must be positive, got {tui_min_terminal_cols}")
         if tui_min_terminal_rows <= 0:
-            raise ValueError(
-                f"tui_min_terminal_rows must be positive, got {tui_min_terminal_rows}"
-            )
+            raise ValueError(f"tui_min_terminal_rows must be positive, got {tui_min_terminal_rows}")
         if max_retries <= 0:
             raise ValueError(f"max_retries must be positive, got {max_retries}")
         if context_limit_wait_seconds <= 0:
@@ -914,12 +913,9 @@ def read_task_details(tasks_path: Path) -> list[TaskDetail]:
 
             description = " ".join(desc_lines)[:200]  # Limit to 200 chars
 
-            tasks.append(TaskDetail(
-                task_id=task_id,
-                title=title,
-                status=status,
-                description=description
-            ))
+            tasks.append(
+                TaskDetail(task_id=task_id, title=title, status=status, description=description)
+            )
     else:
         # Checkbox format
         for match in TASK_PATTERN.finditer(task_text):
@@ -934,12 +930,14 @@ def read_task_details(tasks_path: Path) -> list[TaskDetail]:
             else:
                 status = "pending"
 
-            tasks.append(TaskDetail(
-                task_id=task_num or str(len(tasks) + 1),
-                title=title,
-                status=status,
-                description=""
-            ))
+            tasks.append(
+                TaskDetail(
+                    task_id=task_num or str(len(tasks) + 1),
+                    title=title,
+                    status=status,
+                    description="",
+                )
+            )
 
     return tasks
 
@@ -990,12 +988,9 @@ def get_all_spec_progress(project: Path, cfg: Config) -> list[SpecProgress]:
         else:
             ctime = spec_path.stat().st_ctime
 
-        progress_list.append(SpecProgress(
-            name=name,
-            path=spec_path,
-            stats=stats,
-            creation_time=ctime
-        ))
+        progress_list.append(
+            SpecProgress(name=name, path=spec_path, stats=stats, creation_time=ctime)
+        )
 
     # Sort by creation time (oldest first)
     progress_list.sort(key=lambda x: x.creation_time)
@@ -1035,7 +1030,8 @@ def has_claude_flow_activity(project_path: Path, since_seconds: float = 60) -> b
         if last_run:
             try:
                 from datetime import datetime
-                last_run_time = datetime.fromisoformat(last_run.replace('Z', '+00:00'))
+
+                last_run_time = datetime.fromisoformat(last_run.replace("Z", "+00:00"))
                 time_diff = current_time - last_run_time.timestamp()
                 if time_diff < since_seconds:
                     return True
@@ -1061,10 +1057,12 @@ def display_claude_flow_status(project_path: Path) -> None:
         if stats.get("runCount", 0) > 0:
             success_rate = (stats.get("successCount", 0) / stats["runCount"]) * 100
 
-        print(f"{status:12} {name:15} | "
-              f"Runs: {stats.get('runCount', 0):4} | "
-              f"Success: {success_rate:5.1f}% | "
-              f"Avg: {stats.get('averageDurationMs', 0):8.1f}ms")
+        print(
+            f"{status:12} {name:15} | "
+            f"Runs: {stats.get('runCount', 0):4} | "
+            f"Success: {success_rate:5.1f}% | "
+            f"Avg: {stats.get('averageDurationMs', 0):8.1f}ms"
+        )
 
 
 def display_overall_progress(project: Path, cfg: Config) -> None:
@@ -1087,8 +1085,10 @@ def display_overall_progress(project: Path, cfg: Config) -> None:
     print("OVERALL PROGRESS SUMMARY")
     print("=" * 80)
     print(f"\nSpecs: {completed_specs}/{total_specs} completed")
-    print(f"Tasks: {completed_tasks}/{total_tasks} completed " +
-          f"({in_progress_tasks} in progress, {pending_tasks} pending)")
+    print(
+        f"Tasks: {completed_tasks}/{total_tasks} completed "
+        + f"({in_progress_tasks} in progress, {pending_tasks} pending)"
+    )
 
     if total_tasks > 0:
         overall_percentage = (completed_tasks / total_tasks) * 100
@@ -1144,19 +1144,22 @@ def display_spec_queue(project: Path, cfg: Config) -> None:
         specs_with_metadata.append((idx, name, spec_path, ctime, has_work))
 
     # Sort by creation time (oldest first) but keep original indices
-    unfinished = [(idx, name, path, ctime) for idx, name, path, ctime, has_work
-                  in specs_with_metadata if has_work]
+    unfinished = [
+        (idx, name, path, ctime)
+        for idx, name, path, ctime, has_work in specs_with_metadata
+        if has_work
+    ]
     unfinished.sort(key=lambda x: x[3])  # Sort by ctime
 
     if not unfinished:
         print("\n✓ No unfinished specs found. All specs are complete!")
         return
 
-    print(f"\n{'='*90}")
-    print(f"Unfinished Specs Queue (sorted by creation time, oldest first)")
-    print(f"{'='*90}")
+    print(f"\n{'=' * 90}")
+    print("Unfinished Specs Queue (sorted by creation time, oldest first)")
+    print(f"{'=' * 90}")
     print(f"{'#':<6}{'Spec Name':<40}{'Status':<25}{'Created'}")
-    print(f"{'-'*90}")
+    print(f"{'-' * 90}")
 
     for idx, name, spec_path, ctime in unfinished:
         tasks_path = spec_path / cfg.tasks_filename
@@ -1165,9 +1168,9 @@ def display_spec_queue(project: Path, cfg: Config) -> None:
         status = f"{stats.done}/{stats.total} tasks ({stats.in_progress} in progress)"
         print(f"{idx:<6}{name:<40}{status:<25}{created_date}")
 
-    print(f"{'-'*90}")
+    print(f"{'-' * 90}")
     print(f"Total: {len(unfinished)} unfinished spec(s)")
-    print(f"\nTip: Use indices like '1,3,5' to select multiple specs in custom order\n")
+    print("\nTip: Use indices like '1,3,5' to select multiple specs in custom order\n")
 
 
 def _is_filter_string(text: str) -> bool:
@@ -1175,7 +1178,9 @@ def _is_filter_string(text: str) -> bool:
     return bool(re.match(r"^[a-zA-Z_\-]+$", text))
 
 
-def _display_menu(title: str, filtered_options: Sequence[T], label: Callable[[T], str], current_filter: str) -> None:
+def _display_menu(
+    title: str, filtered_options: Sequence[T], label: Callable[[T], str], current_filter: str
+) -> None:
     """Display the menu with current filter."""
     filter_info = f" [filter: '{current_filter}']" if current_filter else ""
     print(f"\n{title}{filter_info}")

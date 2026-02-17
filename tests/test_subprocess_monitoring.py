@@ -3,10 +3,7 @@
 from __future__ import annotations
 
 import subprocess
-import time
 from unittest.mock import Mock, patch
-
-import pytest
 
 from spec_workflow_runner.subprocess_helpers import (
     monitor_process_with_timeout,
@@ -67,8 +64,8 @@ class TestMonitorProcessWithTimeout:
         callback.assert_any_call("Line 1\n")
         callback.assert_any_call("Line 2\n")
 
-    @patch('spec_workflow_runner.subprocess_helpers.time.time')
-    @patch('spec_workflow_runner.subprocess_helpers.time.sleep')
+    @patch("spec_workflow_runner.subprocess_helpers.time.time")
+    @patch("spec_workflow_runner.subprocess_helpers.time.sleep")
     def test_timeout_detection(self, mock_sleep, mock_time):
         """Test timeout detection when process hangs."""
         # Simulate time passing - provide enough values for all calls

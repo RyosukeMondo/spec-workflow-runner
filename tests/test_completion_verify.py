@@ -147,9 +147,7 @@ def test_check_files_exist_some_missing(project_with_changes: Path):
     assert "lib/missing_file.dart" in missing
 
 
-def test_verify_in_progress_tasks_valid(
-    tasks_md_in_progress: Path, project_with_changes: Path
-):
+def test_verify_in_progress_tasks_valid(tasks_md_in_progress: Path, project_with_changes: Path):
     """Test verifying in-progress tasks with valid implementation."""
     import subprocess
 
@@ -169,9 +167,7 @@ def test_verify_in_progress_tasks_valid(
     assert valid_task.should_mark_complete
 
 
-def test_verify_in_progress_tasks_invalid(
-    tasks_md_in_progress: Path, project_with_changes: Path
-):
+def test_verify_in_progress_tasks_invalid(tasks_md_in_progress: Path, project_with_changes: Path):
     """Test verifying in-progress tasks with missing implementation."""
     import subprocess
 

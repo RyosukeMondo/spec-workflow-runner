@@ -2,18 +2,19 @@
 """Test passing file handle from main thread to worker thread."""
 
 import subprocess
-import time
 import threading
 from pathlib import Path
 
 command_list = [
     "claude",
     "--print",
-    "--model", "sonnet",
+    "--model",
+    "sonnet",
     "--dangerously-skip-permissions",
-    "--output-format", "stream-json",
+    "--output-format",
+    "stream-json",
     "--verbose",
-    "Say hello in 3 words"
+    "Say hello in 3 words",
 ]
 
 command_str = subprocess.list2cmdline(command_list)
@@ -23,6 +24,7 @@ log_file = Path("test_handle.log")
 
 # EXACT pattern from run_tasks.py
 output_lines = []
+
 
 def read_output(proc, handle, output_lines):
     """Exact function from run_tasks.py"""
@@ -49,6 +51,7 @@ def read_output(proc, handle, output_lines):
 
     print(f"[DEBUG] Reader finished. Got {line_count} lines", flush=True)
 
+
 # Open file in main thread, pass handle to worker thread
 with log_file.open("w", encoding="utf-8") as handle:
     proc = subprocess.Popen(
@@ -66,9 +69,7 @@ with log_file.open("w", encoding="utf-8") as handle:
 
     # Start reader thread - EXACTLY like run_tasks.py
     reader_thread = threading.Thread(
-        target=read_output,
-        args=(proc, handle, output_lines),
-        daemon=True
+        target=read_output, args=(proc, handle, output_lines), daemon=True
     )
     reader_thread.start()
     print("[DEBUG] Reader thread started from main")

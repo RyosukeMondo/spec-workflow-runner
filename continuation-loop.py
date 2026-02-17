@@ -14,7 +14,7 @@ def safe_print(text: str):
     try:
         print(text)
     except UnicodeEncodeError:
-        print(text.encode('ascii', errors='replace').decode('ascii'))
+        print(text.encode("ascii", errors="replace").decode("ascii"))
 
 
 def run_continue_session(
@@ -44,9 +44,11 @@ def run_continue_session(
             [
                 "claude",
                 "--print",
-                "--model", "sonnet",
+                "--model",
+                "sonnet",
                 "--dangerously-skip-permissions",
-                "--output-format", "stream-json",
+                "--output-format",
+                "stream-json",
                 "--verbose",
                 "--continue",  # KEY: Resume previous session
                 prompt,
@@ -54,8 +56,8 @@ def run_continue_session(
             cwd=project_path,
             capture_output=False,  # Show output to user
             text=True,
-            encoding='utf-8',
-            errors='replace',
+            encoding="utf-8",
+            errors="replace",
         )
 
         if result.returncode != 0:
@@ -65,7 +67,6 @@ def run_continue_session(
         time.sleep(2)
 
         # Check completion after this probe
-        from detect_completion import assess_completion_confidence
         from detect_active_agents import check_agent_activity
 
         # Get log file (most recent)
@@ -89,7 +90,7 @@ def run_continue_session(
             safe_print("\n✅ No active agents detected - assuming complete")
             return True
 
-        safe_print(f"\n⏳ Agents still active, waiting before next probe...")
+        safe_print("\n⏳ Agents still active, waiting before next probe...")
         time.sleep(30)  # Wait 30s between probes
 
     safe_print(f"\n⚠️  Reached max probes ({max_probes}), stopping")
@@ -153,9 +154,11 @@ Be specific and actionable."""
             [
                 "claude",
                 "--print",
-                "--model", "sonnet",
+                "--model",
+                "sonnet",
                 "--dangerously-skip-permissions",
-                "--output-format", "stream-json",
+                "--output-format",
+                "stream-json",
                 "--verbose",
                 "--continue",
                 prompt,
@@ -163,8 +166,8 @@ Be specific and actionable."""
             cwd=project_path,
             capture_output=True,
             text=True,
-            encoding='utf-8',
-            errors='replace',
+            encoding="utf-8",
+            errors="replace",
             timeout=300,
         )
 
@@ -187,6 +190,7 @@ Be specific and actionable."""
 
         # Check agent activity
         from detect_active_agents import check_agent_activity
+
         activity = check_agent_activity(project_path)
 
         safe_print(f"\n{'=' * 80}")
@@ -213,7 +217,7 @@ Be specific and actionable."""
             }
 
         # Wait before next probe
-        safe_print(f"\n⏳ Waiting 30s before next probe...")
+        safe_print("\n⏳ Waiting 30s before next probe...")
         time.sleep(30)
 
     return {
@@ -272,4 +276,5 @@ def main():
 
 if __name__ == "__main__":
     import sys
+
     sys.exit(main())

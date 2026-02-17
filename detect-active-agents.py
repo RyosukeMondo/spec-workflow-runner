@@ -10,7 +10,6 @@ import json
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
 
 
 def safe_print(text: str):
@@ -18,7 +17,7 @@ def safe_print(text: str):
     try:
         print(text)
     except UnicodeEncodeError:
-        print(text.encode('ascii', errors='replace').decode('ascii'))
+        print(text.encode("ascii", errors="replace").decode("ascii"))
 
 
 def check_claude_flow_daemon(project_path: Path) -> bool:
@@ -34,8 +33,8 @@ def check_claude_flow_daemon(project_path: Path) -> bool:
             cwd=project_path,
             capture_output=True,
             text=True,
-            encoding='utf-8',
-            errors='replace',
+            encoding="utf-8",
+            errors="replace",
             timeout=10,
         )
 
@@ -59,7 +58,7 @@ def get_active_workers(project_path: Path) -> list[dict]:
         if not daemon_state_file.exists():
             return []
 
-        with open(daemon_state_file, 'r', encoding='utf-8') as f:
+        with open(daemon_state_file, encoding="utf-8") as f:
             state = json.load(f)
 
         # Get active workers from state
@@ -70,12 +69,14 @@ def get_active_workers(project_path: Path) -> list[dict]:
             if isinstance(worker_data, dict):
                 status = worker_data.get("status", "")
                 if status in ("running", "pending", "queued"):
-                    active_workers.append({
-                        "type": worker_type,
-                        "status": status,
-                        "started_at": worker_data.get("startedAt"),
-                        "last_run": worker_data.get("lastRun"),
-                    })
+                    active_workers.append(
+                        {
+                            "type": worker_type,
+                            "status": status,
+                            "started_at": worker_data.get("startedAt"),
+                            "last_run": worker_data.get("lastRun"),
+                        }
+                    )
 
         return active_workers
 
@@ -232,9 +233,7 @@ def main():
     """Main entry point for agent detection."""
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Detect active claude-flow agents/workers"
-    )
+    parser = argparse.ArgumentParser(description="Detect active claude-flow agents/workers")
     parser.add_argument(
         "--project-path",
         type=Path,

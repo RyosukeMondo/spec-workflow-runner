@@ -2,7 +2,6 @@
 """Integration test to diagnose Claude subprocess output issue."""
 
 import subprocess
-import sys
 import time
 
 print("=" * 80)
@@ -10,11 +9,20 @@ print("Test 1: Direct subprocess.run (blocking)")
 print("=" * 80)
 
 result = subprocess.run(
-    ["claude", "--print", "--model", "sonnet", "--dangerously-skip-permissions",
-     "--output-format", "stream-json", "--verbose", "Say hello in 3 words"],
+    [
+        "claude",
+        "--print",
+        "--model",
+        "sonnet",
+        "--dangerously-skip-permissions",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "Say hello in 3 words",
+    ],
     capture_output=True,
     text=True,
-    timeout=15
+    timeout=15,
 )
 
 print(f"Return code: {result.returncode}")
@@ -27,8 +35,17 @@ print("Test 2: subprocess.Popen with PIPE (non-blocking)")
 print("=" * 80)
 
 proc = subprocess.Popen(
-    ["claude", "--print", "--model", "sonnet", "--dangerously-skip-permissions",
-     "--output-format", "stream-json", "--verbose", "Say hello in 3 words"],
+    [
+        "claude",
+        "--print",
+        "--model",
+        "sonnet",
+        "--dangerously-skip-permissions",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "Say hello in 3 words",
+    ],
     stdin=subprocess.DEVNULL,
     stdout=subprocess.PIPE,
     stderr=subprocess.STDOUT,
@@ -41,14 +58,14 @@ print("Waiting 5 seconds for output...")
 time.sleep(5)
 
 # Try to read with timeout
-proc.stdout.flush() if hasattr(proc.stdout, 'flush') else None
+proc.stdout.flush() if hasattr(proc.stdout, "flush") else None
 lines = []
 start = time.time()
 while time.time() - start < 10:
     line = proc.stdout.readline()
     if not line:
         break
-    decoded = line.decode('utf-8', errors='replace').strip()
+    decoded = line.decode("utf-8", errors="replace").strip()
     lines.append(decoded)
     print(f"Line {len(lines)}: {decoded[:100]}")
     if len(lines) >= 5:  # Get first 5 lines
@@ -90,7 +107,7 @@ while time.time() - start < 10:
     line = proc.stdout.readline()
     if not line:
         break
-    decoded = line.decode('utf-8', errors='replace').strip()
+    decoded = line.decode("utf-8", errors="replace").strip()
     lines.append(decoded)
     print(f"Line {len(lines)}: {decoded[:100]}")
     if len(lines) >= 5:

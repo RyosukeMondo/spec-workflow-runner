@@ -176,7 +176,13 @@ def test_claude_provider_with_model() -> None:
     )
 
     assert cmd.executable == "claude"
-    assert cmd.args == ("--print", "--model", "sonnet", "--dangerously-skip-permissions", "test prompt")
+    assert cmd.args == (
+        "--print",
+        "--model",
+        "sonnet",
+        "--dangerously-skip-permissions",
+        "test prompt",
+    )
 
 
 def test_claude_provider_with_model_no_skip_permissions() -> None:

@@ -76,7 +76,7 @@ class TaskValidator:
                 issue_type=IssueType.PARSE_ERROR,
                 line_number=0,
                 line_content="",
-                message=f"File not found: {file_path}"
+                message=f"File not found: {file_path}",
             )
             return ValidationResult(is_valid=False, issues=(issue,))
 
@@ -114,7 +114,7 @@ class TaskValidator:
                 issue_type=IssueType.PARSE_ERROR,
                 line_number=0,
                 line_content="",
-                message=f"Error reading file: {err}"
+                message=f"Error reading file: {err}",
             )
             return ValidationResult(is_valid=False, issues=(issue,))
 
@@ -145,7 +145,7 @@ class TaskValidator:
                         issue_type=IssueType.MISSING_CHECKBOX,
                         line_number=line_num,
                         line_content=line,
-                        message="Task line missing valid checkbox [ ], [x], or [-]"
+                        message="Task line missing valid checkbox [ ], [x], or [-]",
                     )
                 )
             elif not re.search(r"\d+(?:\.\d+)*\.", line):
@@ -154,7 +154,7 @@ class TaskValidator:
                         issue_type=IssueType.INVALID_TASK_ID,
                         line_number=line_num,
                         line_content=line,
-                        message="Task line missing valid task ID (e.g., '1.' or '4.2.')"
+                        message="Task line missing valid task ID (e.g., '1.' or '4.2.')",
                     )
                 )
             else:
@@ -166,7 +166,7 @@ class TaskValidator:
                             issue_type=IssueType.INVALID_CHECKBOX,
                             line_number=line_num,
                             line_content=line,
-                            message=f"Invalid checkbox character: [{checkbox_match.group(1)}]"
+                            message=f"Invalid checkbox character: [{checkbox_match.group(1)}]",
                         )
                     )
                 else:
@@ -176,7 +176,7 @@ class TaskValidator:
                             issue_type=IssueType.PARSE_ERROR,
                             line_number=line_num,
                             line_content=line,
-                            message="Task line does not match expected format"
+                            message="Task line does not match expected format",
                         )
                     )
             return
@@ -192,7 +192,7 @@ class TaskValidator:
                     issue_type=IssueType.DUPLICATE_TASK_ID,
                     line_number=line_num,
                     line_content=line,
-                    message=f"Duplicate task ID: {task_id}"
+                    message=f"Duplicate task ID: {task_id}",
                 )
             )
         else:
@@ -205,7 +205,7 @@ class TaskValidator:
                     issue_type=IssueType.MISSING_TITLE,
                     line_number=line_num,
                     line_content=line,
-                    message="Task has no title"
+                    message="Task has no title",
                 )
             )
 
@@ -217,7 +217,7 @@ class TaskValidator:
                         issue_type=IssueType.INCONSISTENT_NUMBERING,
                         line_number=line_num,
                         line_content=line,
-                        message=f"Expected task ID {expected_next_id}, found {task_id}"
+                        message=f"Expected task ID {expected_next_id}, found {task_id}",
                     )
                 )
 

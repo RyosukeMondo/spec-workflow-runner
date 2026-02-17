@@ -2,10 +2,8 @@
 
 from __future__ import annotations
 
-import io
-import select
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -42,9 +40,7 @@ class TestArrowKeyHandling:
 
     def test_poll_keyboard_handles_up_arrow(self, tui_app):
         """Test that up arrow escape sequence is recognized."""
-        with patch('select.select') as mock_select, \
-             patch('sys.stdin') as mock_stdin:
-
+        with patch("select.select") as mock_select, patch("sys.stdin") as mock_stdin:
             # Simulate stdin having data available
             mock_select.side_effect = [
                 ([mock_stdin], [], []),  # First char available
@@ -53,16 +49,14 @@ class TestArrowKeyHandling:
             ]
 
             # Simulate reading escape sequence for up arrow: \x1b[A
-            mock_stdin.read.side_effect = ['\x1b', '[', 'A']
+            mock_stdin.read.side_effect = ["\x1b", "[", "A"]
 
             key = tui_app._poll_keyboard(timeout=0.1)
-            assert key == 'up'
+            assert key == "up"
 
     def test_poll_keyboard_handles_down_arrow(self, tui_app):
         """Test that down arrow escape sequence is recognized."""
-        with patch('select.select') as mock_select, \
-             patch('sys.stdin') as mock_stdin:
-
+        with patch("select.select") as mock_select, patch("sys.stdin") as mock_stdin:
             mock_select.side_effect = [
                 ([mock_stdin], [], []),
                 ([mock_stdin], [], []),
@@ -70,16 +64,14 @@ class TestArrowKeyHandling:
             ]
 
             # Simulate reading escape sequence for down arrow: \x1b[B
-            mock_stdin.read.side_effect = ['\x1b', '[', 'B']
+            mock_stdin.read.side_effect = ["\x1b", "[", "B"]
 
             key = tui_app._poll_keyboard(timeout=0.1)
-            assert key == 'down'
+            assert key == "down"
 
     def test_poll_keyboard_handles_left_arrow(self, tui_app):
         """Test that left arrow escape sequence is recognized."""
-        with patch('select.select') as mock_select, \
-             patch('sys.stdin') as mock_stdin:
-
+        with patch("select.select") as mock_select, patch("sys.stdin") as mock_stdin:
             mock_select.side_effect = [
                 ([mock_stdin], [], []),
                 ([mock_stdin], [], []),
@@ -87,16 +79,14 @@ class TestArrowKeyHandling:
             ]
 
             # Simulate reading escape sequence for left arrow: \x1b[D
-            mock_stdin.read.side_effect = ['\x1b', '[', 'D']
+            mock_stdin.read.side_effect = ["\x1b", "[", "D"]
 
             key = tui_app._poll_keyboard(timeout=0.1)
-            assert key == 'left'
+            assert key == "left"
 
     def test_poll_keyboard_handles_right_arrow(self, tui_app):
         """Test that right arrow escape sequence is recognized."""
-        with patch('select.select') as mock_select, \
-             patch('sys.stdin') as mock_stdin:
-
+        with patch("select.select") as mock_select, patch("sys.stdin") as mock_stdin:
             mock_select.side_effect = [
                 ([mock_stdin], [], []),
                 ([mock_stdin], [], []),
@@ -104,16 +94,14 @@ class TestArrowKeyHandling:
             ]
 
             # Simulate reading escape sequence for right arrow: \x1b[C
-            mock_stdin.read.side_effect = ['\x1b', '[', 'C']
+            mock_stdin.read.side_effect = ["\x1b", "[", "C"]
 
             key = tui_app._poll_keyboard(timeout=0.1)
-            assert key == 'right'
+            assert key == "right"
 
     def test_poll_keyboard_handles_plain_escape(self, tui_app):
         """Test that plain ESC key is recognized when not part of sequence."""
-        with patch('select.select') as mock_select, \
-             patch('sys.stdin') as mock_stdin:
-
+        with patch("select.select") as mock_select, patch("sys.stdin") as mock_stdin:
             # First call: stdin has data (ESC char)
             # Second call: no more data (not an escape sequence)
             mock_select.side_effect = [
@@ -121,25 +109,23 @@ class TestArrowKeyHandling:
                 ([], [], []),  # No more chars
             ]
 
-            mock_stdin.read.side_effect = ['\x1b']
+            mock_stdin.read.side_effect = ["\x1b"]
 
             key = tui_app._poll_keyboard(timeout=0.1)
-            assert key == '\x1b'
+            assert key == "\x1b"
 
     def test_poll_keyboard_handles_regular_char(self, tui_app):
         """Test that regular characters are returned as-is."""
-        with patch('select.select') as mock_select, \
-             patch('sys.stdin') as mock_stdin:
-
+        with patch("select.select") as mock_select, patch("sys.stdin") as mock_stdin:
             mock_select.return_value = ([mock_stdin], [], [])
-            mock_stdin.read.return_value = 'a'
+            mock_stdin.read.return_value = "a"
 
             key = tui_app._poll_keyboard(timeout=0.1)
-            assert key == 'a'
+            assert key == "a"
 
     def test_poll_keyboard_timeout_returns_none(self, tui_app):
         """Test that timeout with no input returns None."""
-        with patch('select.select') as mock_select:
+        with patch("select.select") as mock_select:
             # No data available
             mock_select.return_value = ([], [], [])
 
@@ -148,11 +134,9 @@ class TestArrowKeyHandling:
 
     def test_poll_keyboard_handles_read_error(self, tui_app):
         """Test that read errors are handled gracefully."""
-        with patch('select.select') as mock_select, \
-             patch('sys.stdin') as mock_stdin:
-
+        with patch("select.select") as mock_select, patch("sys.stdin") as mock_stdin:
             mock_select.return_value = ([mock_stdin], [], [])
-            mock_stdin.read.side_effect = IOError("Read error")
+            mock_stdin.read.side_effect = OSError("Read error")
 
             key = tui_app._poll_keyboard(timeout=0.1)
             assert key is None

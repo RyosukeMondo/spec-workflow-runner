@@ -10,9 +10,8 @@ from pathlib import Path
 
 from rich.panel import Panel
 from rich.table import Table
-from rich.text import Text
 
-from ..task_parser import Task, TaskStatus, parse_tasks_file
+from ..task_parser import TaskStatus, parse_tasks_file
 
 
 def _get_status_icon(status: TaskStatus) -> tuple[str, str]:

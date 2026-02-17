@@ -223,8 +223,7 @@ class TestStartRunner:
         assert mock_mkdir.call_count >= 1
         calls = mock_mkdir.call_args_list
         assert any(
-            call_args.kwargs.get("parents") is True
-            and call_args.kwargs.get("exist_ok") is True
+            call_args.kwargs.get("parents") is True and call_args.kwargs.get("exist_ok") is True
             for call_args in calls
         )
 
@@ -238,9 +237,7 @@ class TestStopRunner:
             runner_manager.stop_runner("nonexistent-id")
 
     @patch("spec_workflow_runner.tui.runner_manager.subprocess.Popen")
-    def test_stop_runner_no_process_handle(
-        self, mock_popen, runner_manager, mock_persister
-    ):
+    def test_stop_runner_no_process_handle(self, mock_popen, runner_manager, mock_persister):
         """Test stop_runner handles missing process handle gracefully."""
         # Add a runner without a process
         runner = RunnerState(
@@ -265,9 +262,7 @@ class TestStopRunner:
         mock_persister.save.assert_called()
 
     @patch("spec_workflow_runner.tui.runner_manager.subprocess.Popen")
-    def test_stop_runner_sigterm_success(
-        self, mock_popen, runner_manager, mock_persister
-    ):
+    def test_stop_runner_sigterm_success(self, mock_popen, runner_manager, mock_persister):
         """Test stop_runner sends SIGTERM and waits successfully."""
         # Setup runner and process
         runner = RunnerState(
@@ -303,9 +298,7 @@ class TestStopRunner:
         mock_persister.save.assert_called()
 
     @patch("spec_workflow_runner.tui.runner_manager.subprocess.Popen")
-    def test_stop_runner_sigterm_non_zero_exit(
-        self, mock_popen, runner_manager, mock_persister
-    ):
+    def test_stop_runner_sigterm_non_zero_exit(self, mock_popen, runner_manager, mock_persister):
         """Test stop_runner marks runner as CRASHED on non-zero exit."""
         runner = RunnerState(
             runner_id="test-id",
@@ -332,9 +325,7 @@ class TestStopRunner:
         assert runner_manager.runners["test-id"].exit_code == 1
 
     @patch("spec_workflow_runner.tui.runner_manager.subprocess.Popen")
-    def test_stop_runner_sigkill_escalation(
-        self, mock_popen, runner_manager, mock_persister
-    ):
+    def test_stop_runner_sigkill_escalation(self, mock_popen, runner_manager, mock_persister):
         """Test stop_runner escalates to SIGKILL on timeout."""
         runner = RunnerState(
             runner_id="test-id",
@@ -352,9 +343,7 @@ class TestStopRunner:
         mock_process = Mock()
         mock_process.send_signal = Mock()
         # First wait times out, second wait (after kill) succeeds
-        mock_process.wait = Mock(
-            side_effect=[subprocess.TimeoutExpired("cmd", 5), -9]
-        )
+        mock_process.wait = Mock(side_effect=[subprocess.TimeoutExpired("cmd", 5), -9])
         mock_process.kill = Mock()
         runner_manager.processes["test-id"] = mock_process
 
@@ -369,9 +358,7 @@ class TestStopRunner:
         assert runner_manager.runners["test-id"].exit_code == -9
 
     @patch("spec_workflow_runner.tui.runner_manager.subprocess.Popen")
-    def test_stop_runner_process_already_exited(
-        self, mock_popen, runner_manager, mock_persister
-    ):
+    def test_stop_runner_process_already_exited(self, mock_popen, runner_manager, mock_persister):
         """Test stop_runner handles ProcessLookupError gracefully."""
         runner = RunnerState(
             runner_id="test-id",
@@ -479,9 +466,7 @@ class TestCheckRunnerHealth:
         status = runner_manager.check_runner_health("test-id")
         assert status == RunnerStatus.STOPPED
 
-    def test_check_runner_health_no_process_handle(
-        self, runner_manager, mock_persister
-    ):
+    def test_check_runner_health_no_process_handle(self, runner_manager, mock_persister):
         """Test check_runner_health marks as CRASHED when no process handle."""
         runner = RunnerState(
             runner_id="test-id",
@@ -586,9 +571,7 @@ class TestDetectNewCommits:
             runner_manager.detect_new_commits("nonexistent-id")
 
     @patch("spec_workflow_runner.tui.runner_manager.get_current_commit")
-    def test_detect_new_commits_no_changes(
-        self, mock_get_commit, runner_manager
-    ):
+    def test_detect_new_commits_no_changes(self, mock_get_commit, runner_manager):
         """Test detect_new_commits returns None when no new commits."""
         runner = RunnerState(
             runner_id="test-id",
@@ -613,9 +596,7 @@ class TestDetectNewCommits:
 
     @patch("spec_workflow_runner.tui.runner_manager.subprocess.run")
     @patch("spec_workflow_runner.tui.runner_manager.get_current_commit")
-    def test_detect_new_commits_has_new_commit(
-        self, mock_get_commit, mock_run, runner_manager
-    ):
+    def test_detect_new_commits_has_new_commit(self, mock_get_commit, mock_run, runner_manager):
         """Test detect_new_commits returns hash and message for new commit."""
         runner = RunnerState(
             runner_id="test-id",
@@ -646,9 +627,7 @@ class TestDetectNewCommits:
 
     @patch("spec_workflow_runner.tui.runner_manager.subprocess.run")
     @patch("spec_workflow_runner.tui.runner_manager.get_current_commit")
-    def test_detect_new_commits_git_error(
-        self, mock_get_commit, mock_run, runner_manager
-    ):
+    def test_detect_new_commits_git_error(self, mock_get_commit, mock_run, runner_manager):
         """Test detect_new_commits returns None on git error."""
         runner = RunnerState(
             runner_id="test-id",
@@ -673,9 +652,7 @@ class TestDetectNewCommits:
 
     @patch("spec_workflow_runner.tui.runner_manager.subprocess.run")
     @patch("spec_workflow_runner.tui.runner_manager.get_current_commit")
-    def test_detect_new_commits_empty_output(
-        self, mock_get_commit, mock_run, runner_manager
-    ):
+    def test_detect_new_commits_empty_output(self, mock_get_commit, mock_run, runner_manager):
         """Test detect_new_commits returns None when git log output is empty."""
         runner = RunnerState(
             runner_id="test-id",

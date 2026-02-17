@@ -137,9 +137,7 @@ class StatePoller:
                             )
                         )
                     except queue.Full:
-                        logger.warning(
-                            f"Update queue full, skipping tasks update for {spec_name}"
-                        )
+                        logger.warning(f"Update queue full, skipping tasks update for {spec_name}")
 
                 # Check for latest log file in log directory
                 log_dir = spec_dir / self.log_dir_name

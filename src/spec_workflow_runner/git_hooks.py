@@ -5,7 +5,6 @@ Installs temporary pre-commit hooks to prevent commits during implementation.
 
 from __future__ import annotations
 
-import os
 import stat
 from contextlib import contextmanager
 from pathlib import Path
@@ -56,9 +55,7 @@ exit 1
         self.pre_commit_hook.write_text(hook_content)
 
         # Make executable
-        self.pre_commit_hook.chmod(
-            self.pre_commit_hook.stat().st_mode | stat.S_IEXEC
-        )
+        self.pre_commit_hook.chmod(self.pre_commit_hook.stat().st_mode | stat.S_IEXEC)
 
         return True
 
@@ -168,4 +165,5 @@ def main() -> int:
 
 if __name__ == "__main__":
     import sys
+
     sys.exit(main())

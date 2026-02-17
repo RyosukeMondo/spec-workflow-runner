@@ -30,9 +30,7 @@ def project_with_files(tmp_path: Path) -> Path:
 
     # Create mock files
     (tmp_path / "test" / "mocks").mkdir(parents=True)
-    (tmp_path / "test" / "mocks" / "mock_repository.dart").write_text(
-        "class MockRepository {}"
-    )
+    (tmp_path / "test" / "mocks" / "mock_repository.dart").write_text("class MockRepository {}")
 
     return tmp_path
 
@@ -117,9 +115,7 @@ def test_check_implementation_exists_mocks_only(project_with_files: Path):
     assert any("Only test/mock files exist" in issue for issue in issues)
 
 
-def test_validate_completed_tasks_valid(
-    tasks_md_with_completed: Path, project_with_files: Path
-):
+def test_validate_completed_tasks_valid(tasks_md_with_completed: Path, project_with_files: Path):
     """Test validating completed tasks with valid implementation."""
     validations = validate_completed_tasks(tasks_md_with_completed, project_with_files)
 
@@ -128,9 +124,7 @@ def test_validate_completed_tasks_valid(
     assert valid_task.is_valid
 
 
-def test_validate_completed_tasks_invalid(
-    tasks_md_with_completed: Path, project_with_files: Path
-):
+def test_validate_completed_tasks_invalid(tasks_md_with_completed: Path, project_with_files: Path):
     """Test validating completed tasks with missing implementation."""
     validations = validate_completed_tasks(tasks_md_with_completed, project_with_files)
 

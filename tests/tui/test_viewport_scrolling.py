@@ -2,10 +2,8 @@
 
 from pathlib import Path
 
-import pytest
-
 from spec_workflow_runner.tui.models import ProjectState, SpecState
-from spec_workflow_runner.tui.views.tree_view import render_tree, TreeViewport
+from spec_workflow_runner.tui.views.tree_view import TreeViewport, render_tree
 
 
 class TestViewportRendering:
@@ -279,7 +277,7 @@ class TestViewportAutoScroll:
 
         # Selected item should be within viewport
         selected_visible = (
-            selected_line >= viewport.offset and
-            selected_line < viewport.offset + viewport.visible_lines
+            selected_line >= viewport.offset
+            and selected_line < viewport.offset + viewport.visible_lines
         )
         assert selected_visible or viewport.visible_lines == viewport.total_lines

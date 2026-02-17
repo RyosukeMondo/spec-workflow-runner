@@ -42,15 +42,15 @@ def analyze_worker(name: str, stats: dict[str, Any]) -> dict[str, Any]:
         recommendations.append("Review worker implementation and dependencies")
         recommendations.append("Check logs in .claude-flow/logs/headless/")
     elif success_rate < 50:
-        issues.append(f"High failure rate: {failures}/{runs} failures ({100-success_rate:.1f}%)")
+        issues.append(f"High failure rate: {failures}/{runs} failures ({100 - success_rate:.1f}%)")
         recommendations.append("Investigate common failure patterns")
         recommendations.append("Consider disabling worker until fixed")
 
     if avg_duration > 60000:  # > 1 minute
-        issues.append(f"Very slow execution: {avg_duration/1000:.1f}s average")
+        issues.append(f"Very slow execution: {avg_duration / 1000:.1f}s average")
         recommendations.append("Optimize worker logic or increase timeout")
     elif avg_duration > 30000:  # > 30 seconds
-        issues.append(f"Slow execution: {avg_duration/1000:.1f}s average")
+        issues.append(f"Slow execution: {avg_duration / 1000:.1f}s average")
         recommendations.append("Consider performance improvements")
 
     if is_running and avg_duration > 0:
@@ -69,7 +69,7 @@ def analyze_worker(name: str, stats: dict[str, Any]) -> dict[str, Any]:
             "successes": successes,
             "failures": failures,
             "avg_duration_sec": avg_duration / 1000,
-        }
+        },
     }
 
 
@@ -81,18 +81,14 @@ def diagnose_project(project_path: Path) -> dict[str, Any]:
         return {
             "project": project_path.name,
             "claude_flow_enabled": False,
-            "message": "No .claude-flow directory found - claude-flow not initialized"
+            "message": "No .claude-flow directory found - claude-flow not initialized",
         }
 
     try:
         with open(daemon_state, encoding="utf-8") as f:
             data = json.load(f)
     except (json.JSONDecodeError, OSError) as e:
-        return {
-            "project": project_path.name,
-            "claude_flow_enabled": False,
-            "error": str(e)
-        }
+        return {"project": project_path.name, "claude_flow_enabled": False, "error": str(e)}
 
     workers = data.get("workers", {})
     if not workers:
@@ -100,7 +96,7 @@ def diagnose_project(project_path: Path) -> dict[str, Any]:
             "project": project_path.name,
             "claude_flow_enabled": True,
             "workers_count": 0,
-            "message": "No workers configured"
+            "message": "No workers configured",
         }
 
     analyses = [analyze_worker(name, stats) for name, stats in workers.items()]
@@ -167,10 +163,12 @@ def print_diagnosis(diagnosis: dict[str, Any]):
         print("-" * 100)
 
         stats = worker["stats"]
-        print(f"Runs: {stats['runs']} | "
-              f"Successes: {stats['successes']} | "
-              f"Failures: {stats['failures']} | "
-              f"Success Rate: {worker['success_rate']:.1f}%")
+        print(
+            f"Runs: {stats['runs']} | "
+            f"Successes: {stats['successes']} | "
+            f"Failures: {stats['failures']} | "
+            f"Success Rate: {worker['success_rate']:.1f}%"
+        )
         print(f"Average Duration: {stats['avg_duration_sec']:.2f}s")
         print()
 

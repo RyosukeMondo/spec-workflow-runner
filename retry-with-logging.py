@@ -9,16 +9,17 @@ Usage:
 import subprocess
 import sys
 import time
-import os
 from datetime import datetime
 from pathlib import Path
+
 
 def safe_print(text: str):
     """Print text, handling Unicode encoding errors."""
     try:
         print(text)
     except UnicodeEncodeError:
-        print(text.encode('utf-8', errors='replace').decode('utf-8', errors='replace'))
+        print(text.encode("utf-8", errors="replace").decode("utf-8", errors="replace"))
+
 
 def run_with_logging(spec_name: str = "text-selection-annotations"):
     """Run Claude with enhanced logging and crash detection."""
@@ -41,9 +42,11 @@ def run_with_logging(spec_name: str = "text-selection-annotations"):
     cmd = [
         "claude",
         "--print",
-        "--model", "sonnet",
+        "--model",
+        "sonnet",
         "--dangerously-skip-permissions",
-        "--output-format", "stream-json",
+        "--output-format",
+        "stream-json",
         "--verbose",
         f"""Continue work on spec '{spec_name}':
 
@@ -74,7 +77,7 @@ Check and update task status in .spec-workflow/specs/{spec_name}/tasks.md
 4. Update task status: Pending → Completed
 5. Report progress clearly
 
-Work carefully and methodically!"""
+Work carefully and methodically!""",
     ]
 
     # Run with subprocess
@@ -82,16 +85,17 @@ Work carefully and methodically!"""
     safe_print("Launching Claude...\n")
 
     try:
-        with open(log_file, 'w', encoding='utf-8') as log_f, \
-             open(error_file, 'w', encoding='utf-8') as err_f:
-
+        with (
+            open(log_file, "w", encoding="utf-8") as log_f,
+            open(error_file, "w", encoding="utf-8") as err_f,
+        ):
             process = subprocess.Popen(
                 cmd,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 text=True,
-                encoding='utf-8',
-                errors='replace'
+                encoding="utf-8",
+                errors="replace",
             )
 
             # Monitor output
@@ -135,7 +139,7 @@ Work carefully and methodically!"""
             elapsed = time.time() - start_time
             safe_print("\n" + "=" * 80)
             safe_print(f"Process exited with code: {return_code}")
-            safe_print(f"Elapsed time: {elapsed:.1f}s ({elapsed/60:.1f} minutes)")
+            safe_print(f"Elapsed time: {elapsed:.1f}s ({elapsed / 60:.1f} minutes)")
 
             if return_code == 0:
                 safe_print("✅ SUCCESS")
@@ -155,10 +159,12 @@ Work carefully and methodically!"""
     except Exception as e:
         safe_print(f"\n❌ EXCEPTION: {e}")
         import traceback
+
         traceback.print_exc()
         if process:
             process.terminate()
         return 1
+
 
 if __name__ == "__main__":
     spec_name = sys.argv[1] if len(sys.argv) > 1 else "text-selection-annotations"

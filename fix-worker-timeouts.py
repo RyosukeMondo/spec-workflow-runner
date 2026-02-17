@@ -3,7 +3,6 @@
 
 import json
 from pathlib import Path
-from typing import Any
 
 
 def fix_timeout_config(project_path: Path, new_timeout_ms: int = 1800000) -> bool:
@@ -40,7 +39,9 @@ def fix_timeout_config(project_path: Path, new_timeout_ms: int = 1800000) -> boo
         with open(daemon_state, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2)
 
-        print(f"[+] {project_path.name}: Updated timeout from {old_timeout}ms to {new_timeout_ms}ms")
+        print(
+            f"[+] {project_path.name}: Updated timeout from {old_timeout}ms to {new_timeout_ms}ms"
+        )
         print(f"    Backup saved to: {backup_path}")
         return True
 
@@ -62,7 +63,9 @@ def main():
     print("CLAUDE-FLOW WORKER TIMEOUT FIX")
     print("=" * 100)
     print(f"\nChanging workerTimeoutMs from 300000ms (5 min) to {new_timeout_ms}ms (30 min)")
-    print("\nThis will allow optimize and testgaps workers sufficient time to analyze large codebases.")
+    print(
+        "\nThis will allow optimize and testgaps workers sufficient time to analyze large codebases."
+    )
     print("\n" + "=" * 100)
     print()
 
@@ -87,8 +90,8 @@ def main():
         for project_path in projects:
             if project_path.exists():
                 print(f"   cd {project_path}")
-                print(f"   npx @claude-flow/cli@latest daemon stop")
-                print(f"   npx @claude-flow/cli@latest daemon start")
+                print("   npx @claude-flow/cli@latest daemon stop")
+                print("   npx @claude-flow/cli@latest daemon start")
                 print()
 
         print("2. Monitor worker success rates:")

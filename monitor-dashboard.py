@@ -12,7 +12,7 @@ from typing import Any
 
 def clear_screen():
     """Clear the terminal screen."""
-    os.system('cls' if os.name == 'nt' else 'clear')
+    os.system("cls" if os.name == "nt" else "clear")
 
 
 def get_git_status(project_path: Path) -> dict[str, Any]:
@@ -34,7 +34,7 @@ def get_git_status(project_path: Path) -> dict[str, Any]:
             text=True,
             check=True,
         )
-        recent_commits = len(result.stdout.strip().split('\n')) if result.stdout.strip() else 0
+        recent_commits = len(result.stdout.strip().split("\n")) if result.stdout.strip() else 0
 
         # Get uncommitted changes
         result = subprocess.run(
@@ -43,7 +43,7 @@ def get_git_status(project_path: Path) -> dict[str, Any]:
             text=True,
             check=True,
         )
-        uncommitted_files = len(result.stdout.strip().split('\n')) if result.stdout.strip() else 0
+        uncommitted_files = len(result.stdout.strip().split("\n")) if result.stdout.strip() else 0
 
         return {
             "current_commit": current_commit,
@@ -115,21 +115,21 @@ def get_spec_workflow_stats(project_path: Path) -> dict[str, Any]:
 def get_active_processes() -> list[dict]:
     """Get active spec-workflow-run processes."""
     try:
-        if os.name == 'nt':  # Windows
+        if os.name == "nt":  # Windows
             result = subprocess.run(
                 ["tasklist", "/FI", "IMAGENAME eq spec-workflow-run.exe", "/FO", "CSV"],
                 capture_output=True,
                 text=True,
             )
-            lines = result.stdout.strip().split('\n')[1:]  # Skip header
-            return [{"pid": line.split(',')[1].strip('"')} for line in lines if line]
+            lines = result.stdout.strip().split("\n")[1:]  # Skip header
+            return [{"pid": line.split(",")[1].strip('"')} for line in lines if line]
         else:  # Linux/Mac
             result = subprocess.run(
                 ["pgrep", "-f", "spec-workflow-run"],
                 capture_output=True,
                 text=True,
             )
-            pids = result.stdout.strip().split('\n')
+            pids = result.stdout.strip().split("\n")
             return [{"pid": pid} for pid in pids if pid]
     except subprocess.CalledProcessError:
         return []
@@ -155,7 +155,7 @@ def format_worker_status(workers: dict[str, dict]) -> str:
             f"Runs: {runs:4} | Success: {success_rate:5.1f}% | Avg: {avg_ms:8.1f}ms"
         )
 
-    return '\n'.join(lines)
+    return "\n".join(lines)
 
 
 def display_dashboard(projects: list[Path]):
@@ -187,17 +187,21 @@ def display_dashboard(projects: list[Path]):
 
         # Git status
         git_status = get_git_status(project_path)
-        print(f"Git: {git_status['current_commit']} | "
-              f"Recent commits (1h): {git_status['recent_commits']} | "
-              f"Uncommitted: {git_status['uncommitted_files']} files")
+        print(
+            f"Git: {git_status['current_commit']} | "
+            f"Recent commits (1h): {git_status['recent_commits']} | "
+            f"Uncommitted: {git_status['uncommitted_files']} files"
+        )
 
         # Spec workflow stats
         spec_stats = get_spec_workflow_stats(project_path)
         if spec_stats["total_specs"] > 0:
             completion_pct = (spec_stats["completed"] / spec_stats["total_specs"]) * 100
-            print(f"Specs: {spec_stats['completed']}/{spec_stats['total_specs']} complete "
-                  f"({completion_pct:.1f}%) | Active: {spec_stats['active']} | "
-                  f"Remaining: {spec_stats['remaining']}")
+            print(
+                f"Specs: {spec_stats['completed']}/{spec_stats['total_specs']} complete "
+                f"({completion_pct:.1f}%) | Active: {spec_stats['active']} | "
+                f"Remaining: {spec_stats['remaining']}"
+            )
         else:
             print("Specs: No .spec-workflow directory found")
 

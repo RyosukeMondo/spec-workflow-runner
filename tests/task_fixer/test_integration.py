@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-import subprocess
 from pathlib import Path
-from unittest.mock import MagicMock, Mock, patch
+from unittest.mock import Mock, patch
 
 import pytest
 
@@ -118,6 +117,7 @@ class TestCLIIntegration:
 
         # Mock apply_fix to succeed
         from spec_workflow_runner.task_fixer.file_writer import WriteResult
+
         write_result = WriteResult(
             success=True,
             file_path=tasks_file,
@@ -380,6 +380,7 @@ class TestTUIIntegration:
         mock_fixer.fix_tasks_file.return_value = fix_result
 
         from spec_workflow_runner.task_fixer.file_writer import WriteResult
+
         write_result = WriteResult(
             success=True,
             file_path=tasks_file,
@@ -582,6 +583,7 @@ class TestTUIIntegration:
         mock_fixer.fix_tasks_file.return_value = fix_result
 
         from spec_workflow_runner.task_fixer.file_writer import WriteResult
+
         write_result = WriteResult(
             success=False,
             file_path=tasks_file,

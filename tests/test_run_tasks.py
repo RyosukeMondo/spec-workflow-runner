@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import io
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -333,9 +333,7 @@ def test_check_clean_working_tree_passes_when_clean(tmp_path: Path) -> None:
     runner.check_clean_working_tree(tmp_path)
 
 
-def test_check_clean_working_tree_warns_on_uncommitted_changes(
-    tmp_path: Path, capsys
-) -> None:
+def test_check_clean_working_tree_warns_on_uncommitted_changes(tmp_path: Path, capsys) -> None:
     """Verify that check_clean_working_tree warns but continues with uncommitted changes."""
     import subprocess
 
@@ -711,7 +709,7 @@ def test_run_provider_infinite_retries_for_context_limit(tmp_path: Path, monkeyp
     cfg = _make_config()
     # Ensure max_retries is small to verify we go beyond it
     assert cfg.max_retries == 3
-    
+
     provider = CodexProvider()
     log_path = tmp_path / "logs" / "task_1.log"
 

@@ -40,9 +40,7 @@ class TestProjectState:
 
     def test_initialization(self):
         """Test ProjectState initialization with correct field types."""
-        project = ProjectState(
-            path=Path("/home/user/project"), name="my-project", specs=[]
-        )
+        project = ProjectState(path=Path("/home/user/project"), name="my-project", specs=[])
 
         assert isinstance(project.path, Path)
         assert project.path == Path("/home/user/project")
@@ -66,18 +64,14 @@ class TestProjectState:
             in_progress_tasks=2,
             pending_tasks=3,
         )
-        project = ProjectState(
-            path=Path("/home/user/project"), name="my-project", specs=[spec]
-        )
+        project = ProjectState(path=Path("/home/user/project"), name="my-project", specs=[spec])
 
         assert len(project.specs) == 1
         assert project.specs[0] == spec
 
     def test_repr(self):
         """Test ProjectState string representation."""
-        project = ProjectState(
-            path=Path("/home/user/project"), name="my-project", specs=[]
-        )
+        project = ProjectState(path=Path("/home/user/project"), name="my-project", specs=[])
 
         repr_str = repr(project)
         assert "my-project" in repr_str
@@ -515,12 +509,8 @@ class TestAppState:
             in_progress_tasks=2,
             pending_tasks=3,
         )
-        project = ProjectState(
-            path=Path("/project"), name="test-project", specs=[spec]
-        )
-        app_state = AppState(
-            projects=[project], selected_project_index=0, selected_spec_index=0
-        )
+        project = ProjectState(path=Path("/project"), name="test-project", specs=[spec])
+        app_state = AppState(projects=[project], selected_project_index=0, selected_spec_index=0)
 
         assert app_state.selected_spec == spec
 
@@ -534,12 +524,8 @@ class TestAppState:
             in_progress_tasks=2,
             pending_tasks=3,
         )
-        project = ProjectState(
-            path=Path("/project"), name="test-project", specs=[spec]
-        )
-        app_state = AppState(
-            projects=[project], selected_project_index=0, selected_spec_index=5
-        )
+        project = ProjectState(path=Path("/project"), name="test-project", specs=[spec])
+        app_state = AppState(projects=[project], selected_project_index=0, selected_spec_index=5)
 
         assert app_state.selected_spec is None
 
@@ -681,9 +667,7 @@ class TestStatePersister:
         mock_file.assert_called_once()
         # Verify json.dump was called with correct structure
         handle = mock_file()
-        written_data = "".join(
-            call.args[0] for call in handle.write.call_args_list if call.args
-        )
+        written_data = "".join(call.args[0] for call in handle.write.call_args_list if call.args)
         data = json.loads(written_data)
         assert data["config_hash"] == "hash123"
         assert len(data["runners"]) == 1
@@ -763,9 +747,7 @@ class TestStatePersister:
     @patch("pathlib.Path.open", new_callable=mock_open)
     @patch.object(StatePersister, "_compute_config_hash")
     @patch.object(StatePersister, "_is_pid_alive")
-    def test_load_validates_running_pids(
-        self, mock_is_alive, mock_hash, mock_file, mock_exists
-    ):
+    def test_load_validates_running_pids(self, mock_is_alive, mock_hash, mock_file, mock_exists):
         """Test load validates PIDs and marks dead runners as crashed."""
         mock_exists.return_value = True
         mock_hash.return_value = "hash123"
@@ -796,9 +778,7 @@ class TestStatePersister:
     @patch("pathlib.Path.open", new_callable=mock_open)
     @patch.object(StatePersister, "_compute_config_hash")
     @patch.object(StatePersister, "_is_pid_alive")
-    def test_load_keeps_alive_runners(
-        self, mock_is_alive, mock_hash, mock_file, mock_exists
-    ):
+    def test_load_keeps_alive_runners(self, mock_is_alive, mock_hash, mock_file, mock_exists):
         """Test load keeps runners with alive PIDs as running."""
         mock_exists.return_value = True
         mock_hash.return_value = "hash123"
@@ -828,9 +808,7 @@ class TestStatePersister:
     @patch("pathlib.Path.exists")
     @patch("pathlib.Path.open", new_callable=mock_open)
     @patch.object(StatePersister, "_compute_config_hash")
-    def test_load_skips_pid_check_for_stopped(
-        self, mock_hash, mock_file, mock_exists
-    ):
+    def test_load_skips_pid_check_for_stopped(self, mock_hash, mock_file, mock_exists):
         """Test load doesn't validate PIDs for stopped/completed runners."""
         mock_exists.return_value = True
         mock_hash.return_value = "hash123"
@@ -936,9 +914,7 @@ class TestStatePersister:
 
         # Get written data
         handle = mock_file()
-        written_data = "".join(
-            call.args[0] for call in handle.write.call_args_list if call.args
-        )
+        written_data = "".join(call.args[0] for call in handle.write.call_args_list if call.args)
 
         # Setup mock for reading
         mock_file.return_value.__enter__.return_value.read.return_value = written_data

@@ -148,7 +148,9 @@ class ClaudeProvider(Provider):
 
     def get_mcp_add_command(self, server_name: str, package: str) -> ProviderCommand:
         """Get command to add an MCP server."""
-        return ProviderCommand(executable=self._executable, args=("mcp", "add", server_name, package))
+        return ProviderCommand(
+            executable=self._executable, args=("mcp", "add", server_name, package)
+        )
 
     def get_provider_name(self) -> str:
         """Get the human-readable provider name."""
@@ -193,10 +195,13 @@ class GeminiProvider(Provider):
             args.extend(["--model", self._model])
 
         if self._max_risk:
-            args.extend([
-                "--yolo",
-                "--output-format", "json",
-            ])
+            args.extend(
+                [
+                    "--yolo",
+                    "--output-format",
+                    "json",
+                ]
+            )
 
         return ProviderCommand(executable=self._executable, args=tuple(args))
 
@@ -206,7 +211,9 @@ class GeminiProvider(Provider):
 
     def get_mcp_add_command(self, server_name: str, package: str) -> ProviderCommand:
         """Get command to add an MCP server."""
-        return ProviderCommand(executable=self._executable, args=("mcp", "add", server_name, package))
+        return ProviderCommand(
+            executable=self._executable, args=("mcp", "add", server_name, package)
+        )
 
     def get_provider_name(self) -> str:
         """Get the human-readable provider name."""

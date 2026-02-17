@@ -107,8 +107,7 @@ def count_tasks(tasks_md_path: Path) -> TaskProgress:
 
     if pending + in_progress + completed == 0:
         raise ValueError(
-            f"No checkbox tasks found in {tasks_md_path}. "
-            "Expected format: '- [ ] Task title'"
+            f"No checkbox tasks found in {tasks_md_path}. Expected format: '- [ ] Task title'"
         )
 
     return TaskProgress(

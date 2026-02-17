@@ -7,7 +7,6 @@ from __future__ import annotations
 
 import json
 import re
-import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
@@ -253,7 +252,9 @@ def verify_in_progress_tasks(
                 task_id=title.split(".")[0] if "." in title else title[:10],
                 title=title,
                 current_status="in_progress",
-                files_modified=[f for f in files if f in modified_files] if files else modified_files,
+                files_modified=[f for f in files if f in modified_files]
+                if files
+                else modified_files,
                 acceptance=acceptance,
                 verification_passed=verification_passed,
                 issues=issues,
@@ -360,7 +361,7 @@ def make_commit_for_verified_work(
             for task in completed_tasks:
                 commit_msg += f"- {task.task_id}: {task.title}\n"
 
-        commit_msg += f"\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
+        commit_msg += "\n\nCo-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
 
         # Make commit
         result = run_command(
@@ -464,14 +465,14 @@ def main() -> int:
     incomplete = [v for v in result.verifications if not v.should_mark_complete]
 
     if completed:
-        print(f"\n✅ Verified and marked complete:\n")
+        print("\n✅ Verified and marked complete:\n")
         for task in completed:
             print(f"  {task.task_id}: {task.title}")
             if task.files_modified:
                 print(f"    Files: {', '.join(task.files_modified)}")
 
     if incomplete:
-        print(f"\n⏸️  Still in progress (not ready):\n")
+        print("\n⏸️  Still in progress (not ready):\n")
         for task in incomplete:
             print(f"  {task.task_id}: {task.title}")
             for issue in task.issues:

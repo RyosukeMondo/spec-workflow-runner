@@ -101,7 +101,9 @@ class TestStatePollerInit:
 class TestGetMtime:
     """Tests for _get_mtime helper."""
 
-    def test_existing_file(self, tmp_path: Path, update_queue: queue.Queue[StateUpdate], state_file: Path) -> None:
+    def test_existing_file(
+        self, tmp_path: Path, update_queue: queue.Queue[StateUpdate], state_file: Path
+    ) -> None:
         """Should return mtime for existing file."""
         file = tmp_path / "test.txt"
         file.write_text("content")
@@ -356,7 +358,7 @@ class TestPollCycle:
             update_queue=update_queue,
         )
 
-        specs_path = temp_project / ".spec-workflow" / "specs"
+        temp_project / ".spec-workflow" / "specs"
 
         # Mock iterdir to raise OSError
         with patch.object(Path, "iterdir", side_effect=OSError("Permission denied")):
