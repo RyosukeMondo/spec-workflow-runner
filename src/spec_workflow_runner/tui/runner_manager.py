@@ -209,9 +209,11 @@ class RunnerManager:
             started_at=datetime.now(),
             baseline_commit=baseline_commit,
             retry_count=0,
-            max_retries=self.config.retry_config.max_retries
-            if self.config.retry_config.retry_on_crash
-            else 0,
+            max_retries=(
+                self.config.retry_config.max_retries
+                if self.config.retry_config.retry_on_crash
+                else 0
+            ),
         )
 
         # Store runner, process, and log file

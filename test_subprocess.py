@@ -87,7 +87,7 @@ print("=" * 80)
 
 # This mimics what popen_command does on Windows
 cmd_str = (
-    'claude --print --model sonnet --dangerously-skip-permissions '
+    "claude --print --model sonnet --dangerously-skip-permissions "
     '--output-format stream-json --verbose "Say hello in 3 words"'
 )
 proc = subprocess.Popen(

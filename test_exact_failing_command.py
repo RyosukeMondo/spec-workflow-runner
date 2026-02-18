@@ -7,9 +7,9 @@ from pathlib import Path
 
 # EXACT command from last_command.txt
 command_str = (  # noqa: E501
-    r'claude --print --model sonnet --dangerously-skip-permissions'
-    r' --output-format stream-json --verbose'
-    r' --mcp-config C:\Users\ryosu\repos\keyrx\.claude\mcp-only.json'
+    r"claude --print --model sonnet --dangerously-skip-permissions"
+    r" --output-format stream-json --verbose"
+    r" --mcp-config C:\Users\ryosu\repos\keyrx\.claude\mcp-only.json"
     r' "[!] IMPORTANT: NO launch swarms on this session'
     r" - Do not invoke agents or use multiple threading"
     r" to prevent hang-ups from thread management failures."
@@ -35,7 +35,7 @@ command_str = (  # noqa: E501
     " with a clear message, then mark the task as completed"
     " using manage-tasks. DO NOT just stage files - you must"
     " actually commit them. DO NOT ask permission - just start"
-    ' working immediately. Make atomic commits for each'
+    " working immediately. Make atomic commits for each"
     ' semantic group of changes."'
 )
 

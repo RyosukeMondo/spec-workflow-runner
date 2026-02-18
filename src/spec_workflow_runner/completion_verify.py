@@ -252,9 +252,9 @@ def verify_in_progress_tasks(
                 task_id=title.split(".")[0] if "." in title else title[:10],
                 title=title,
                 current_status="in_progress",
-                files_modified=[f for f in files if f in modified_files]
-                if files
-                else modified_files,
+                files_modified=(
+                    [f for f in files if f in modified_files] if files else modified_files
+                ),
                 acceptance=acceptance,
                 verification_passed=verification_passed,
                 issues=issues,

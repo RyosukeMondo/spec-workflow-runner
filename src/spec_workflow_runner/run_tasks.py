@@ -737,7 +737,9 @@ def _execute_provider_command(
                                     try:
                                         print(f"[Thinking: {thinking}...]", flush=True)
                                     except UnicodeEncodeError:
-                                        ascii_thinking = thinking.encode('ascii', errors='replace').decode('ascii')
+                                        ascii_thinking = thinking.encode(
+                                            "ascii", errors="replace"
+                                        ).decode("ascii")
                                         print(
                                             f"[Thinking: {ascii_thinking}...]",
                                             flush=True,
