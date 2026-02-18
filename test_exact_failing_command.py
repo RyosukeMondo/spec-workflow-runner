@@ -6,16 +6,25 @@ import threading
 from pathlib import Path
 
 # EXACT command from last_command.txt
-command_str = (
-    r'claude --print --model sonnet --dangerously-skip-permissions --output-format stream-json --verbose --mcp-config C:\Users\ryosu\repos\keyrx\.claude\mcp-only.json "[!] IMPORTANT: NO launch swarms on this session - Do not invoke agents or use multiple threading to prevent hang-ups from thread management failures.'
+command_str = (  # noqa: E501
+    r'claude --print --model sonnet --dangerously-skip-permissions'
+    r' --output-format stream-json --verbose'
+    r' --mcp-config C:\Users\ryosu\repos\keyrx\.claude\mcp-only.json'
+    r' "[!] IMPORTANT: NO launch swarms on this session'
+    r" - Do not invoke agents or use multiple threading"
+    r" to prevent hang-ups from thread management failures."
     + "\n\n"
-    + r"You have the spec-workflow MCP server available. Use the manage-tasks tool IMMEDIATELY to list all tasks for spec "
+    + r"You have the spec-workflow MCP server available."
+    r" Use the manage-tasks tool IMMEDIATELY to list all tasks for spec "
     "'"
     "bug-remediation-sweep"
     "'"
-    ", find the first pending task, and work on it. You may work on multiple tasks at once if they are similar, related, or beneficial to complete together."
+    ", find the first pending task, and work on it."
+    " You may work on multiple tasks at once if they are similar,"
+    " related, or beneficial to complete together."
     + "\n\n"
-    + r"Before starting work, mark the task as in-progress. When you complete the work, you MUST run "
+    + r"Before starting work, mark the task as in-progress."
+    r" When you complete the work, you MUST run "
     "'"
     "git add"
     "'"
@@ -23,7 +32,11 @@ command_str = (
     "'"
     "git commit"
     "'"
-    ' with a clear message, then mark the task as completed using manage-tasks. DO NOT just stage files - you must actually commit them. DO NOT ask permission - just start working immediately. Make atomic commits for each semantic group of changes."'
+    " with a clear message, then mark the task as completed"
+    " using manage-tasks. DO NOT just stage files - you must"
+    " actually commit them. DO NOT ask permission - just start"
+    ' working immediately. Make atomic commits for each'
+    ' semantic group of changes."'
 )
 
 print(f"Command: {command_str[:200]}...\n")
@@ -74,5 +87,5 @@ else:
 try:
     proc.terminate()
     proc.wait(timeout=5)
-except:
+except Exception:
     proc.kill()

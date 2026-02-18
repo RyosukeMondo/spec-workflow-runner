@@ -353,7 +353,7 @@ def test_validation_issue_immutability() -> None:
         message="test message",
     )
 
-    with pytest.raises(Exception):  # FrozenInstanceError or AttributeError
+    with pytest.raises((AttributeError, TypeError)):  # FrozenInstanceError or AttributeError
         issue.line_number = 2  # type: ignore
 
 
@@ -361,7 +361,7 @@ def test_validation_result_immutability() -> None:
     """Test that ValidationResult is immutable (frozen)."""
     result = ValidationResult(is_valid=True, issues=())
 
-    with pytest.raises(Exception):  # FrozenInstanceError or AttributeError
+    with pytest.raises((AttributeError, TypeError)):  # FrozenInstanceError or AttributeError
         result.is_valid = False  # type: ignore
 
 

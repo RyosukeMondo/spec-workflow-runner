@@ -87,5 +87,5 @@ with log_file.open("w", encoding="utf-8") as handle:
     try:
         proc.terminate()
         proc.wait(timeout=5)
-    except:
+    except Exception:
         proc.kill()

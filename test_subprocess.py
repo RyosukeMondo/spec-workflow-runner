@@ -78,7 +78,7 @@ print(f"Process poll status after reading: {proc.poll()}")
 try:
     proc.terminate()
     proc.wait(timeout=5)
-except:
+except Exception:
     proc.kill()
 
 print("\n" + "=" * 80)
@@ -86,7 +86,10 @@ print("Test 3: subprocess.Popen on Windows with shell=True")
 print("=" * 80)
 
 # This mimics what popen_command does on Windows
-cmd_str = 'claude --print --model sonnet --dangerously-skip-permissions --output-format stream-json --verbose "Say hello in 3 words"'
+cmd_str = (
+    'claude --print --model sonnet --dangerously-skip-permissions '
+    '--output-format stream-json --verbose "Say hello in 3 words"'
+)
 proc = subprocess.Popen(
     cmd_str,
     stdin=subprocess.DEVNULL,
@@ -120,7 +123,7 @@ print(f"Process poll status after reading: {proc.poll()}")
 try:
     proc.terminate()
     proc.wait(timeout=5)
-except:
+except Exception:
     proc.kill()
 
 print("\nTests complete!")

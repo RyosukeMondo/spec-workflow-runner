@@ -258,7 +258,7 @@ def test_write_preserves_file_permissions(
 
     # Set specific permissions
     test_file.chmod(0o644)
-    test_file.stat().st_mode
+    _ = test_file.stat().st_mode
 
     result = file_writer.write_with_backup(test_file, "New\n")
 

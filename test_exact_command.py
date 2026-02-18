@@ -80,5 +80,5 @@ else:
 try:
     proc.terminate()
     proc.wait(timeout=5)
-except:
+except Exception:
     proc.kill()

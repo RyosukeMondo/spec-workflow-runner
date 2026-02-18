@@ -163,10 +163,10 @@ def _parse_spec_indices(input_str: str, specs: list[tuple[str, Path]]) -> list[t
     """Parse comma-separated indices and return selected specs in order."""
     try:
         indices = [int(idx.strip()) for idx in input_str.split(",")]
-    except ValueError:
+    except ValueError as err:
         raise RunnerError(
             f"Invalid index format: '{input_str}'. Use comma-separated numbers like '1,3,5'"
-        )
+        ) from err
 
     selected = []
     for idx in indices:
@@ -660,7 +660,8 @@ def _execute_provider_command(
             f"Activity timeout: {activity_timeout_seconds}s ({activity_timeout_seconds // 60} minutes of inactivity)"
         )
         print(
-            f"Checking activity every: {activity_check_interval_seconds}s ({activity_check_interval_seconds // 60} minutes)"
+            f"Checking activity every: {activity_check_interval_seconds}s "
+            f"({activity_check_interval_seconds // 60} minutes)"
         )
 
     output_lines: list[str] = []
@@ -736,8 +737,9 @@ def _execute_provider_command(
                                     try:
                                         print(f"[Thinking: {thinking}...]", flush=True)
                                     except UnicodeEncodeError:
+                                        ascii_thinking = thinking.encode('ascii', errors='replace').decode('ascii')
                                         print(
-                                            f"[Thinking: {thinking.encode('ascii', errors='replace').decode('ascii')}...]",
+                                            f"[Thinking: {ascii_thinking}...]",
                                             flush=True,
                                         )
 
@@ -870,25 +872,29 @@ def _execute_provider_command(
                     if inactivity_seconds > activity_timeout_seconds:
                         # Inactivity timeout - kill the process
                         print(
-                            f"\n[!]  No file changes for {inactivity_seconds}s (>{activity_timeout_seconds}s). Terminating process..."
+                            f"\n[!]  No file changes for {inactivity_seconds}s "
+                            f"(>{activity_timeout_seconds}s). Terminating process..."
                         )
                         proc.kill()
                         reader_thread.join(timeout=5)
                         handle.write(
-                            f"\n# Inactivity Timeout\nProcess terminated after {inactivity_seconds} seconds of inactivity\n"
+                            f"\n# Inactivity Timeout\n"
+                            f"Process terminated after {inactivity_seconds} seconds of inactivity\n"
                         )
                         handle.write("\n# Exit Code\nINACTIVITY_TIMEOUT\n")
                         raise RunnerError(
                             f"Provider command timed out due to {inactivity_seconds} seconds of inactivity "
                             f"(threshold: {activity_timeout_seconds}s = {activity_timeout_seconds // 60} minutes). "
                             f"The AI may be stuck or waiting for input."
-                        )
+                        ) from None
                     else:
                         # Show periodic status
                         mins = inactivity_seconds // 60
                         secs = inactivity_seconds % 60
+                        max_mins = activity_timeout_seconds // 60
                         print(
-                            f"[{datetime.now().strftime('%H:%M:%S')}] [WAIT] Running... (no file changes for {mins}m {secs}s, max: {activity_timeout_seconds // 60}m)"
+                            f"[{datetime.now().strftime('%H:%M:%S')}] [WAIT] "
+                            f"Running... (no file changes for {mins}m {secs}s, max: {max_mins}m)"
                         )
 
                 # Continue loop
@@ -1001,7 +1007,8 @@ def _execute_provider_command(
             # Check for inactivity threshold
             if inactivity > inactivity_threshold:
                 print(
-                    f"\n[{datetime.now().strftime('%H:%M:%S')}] [DONE] No activity for {int(inactivity)}s - agents appear complete"
+                    f"\n[{datetime.now().strftime('%H:%M:%S')}] [DONE] "
+                    f"No activity for {int(inactivity)}s - agents appear complete"
                 )
                 break
 
@@ -1011,7 +1018,9 @@ def _execute_provider_command(
                 secs_elapsed = int(elapsed) % 60
                 inactive_secs = int(inactivity)
                 print(
-                    f"[{datetime.now().strftime('%H:%M:%S')}] [WAIT] Waiting... ({mins_elapsed}m {secs_elapsed}s elapsed, {inactive_secs}s inactive, {len(commits_detected)} commits)"
+                    f"[{datetime.now().strftime('%H:%M:%S')}] [WAIT] Waiting... "
+                    f"({mins_elapsed}m {secs_elapsed}s elapsed, "
+                    f"{inactive_secs}s inactive, {len(commits_detected)} commits)"
                 )
 
             time.sleep(5)  # Check every 5 seconds
@@ -1159,7 +1168,7 @@ def run_provider(
                             f"({cfg.activity_timeout_seconds}s = {cfg.activity_timeout_seconds // 60} min). "
                             f"The task may be too complex or the AI is stuck. "
                             f"Consider breaking down the task or increasing activity_timeout_seconds."
-                        )
+                        ) from None
                     continue
 
                 # No logs to archive - fail after one retry attempt
@@ -1196,7 +1205,7 @@ def run_provider(
                         f"({cfg.activity_timeout_seconds}s = {cfg.activity_timeout_seconds // 60} min). "
                         f"The task may be too complex or the AI is stuck. "
                         f"Consider breaking down the task or increasing activity_timeout_seconds."
-                    )
+                    ) from None
 
             # Handle rate limit errors
             if is_rate_error:
@@ -1404,7 +1413,7 @@ def run_provider(
                     },
                 )
                 # All retries exhausted - raise the last error
-                raise last_error
+                raise last_error from None
 
 
 def _display_dry_run_spec_status(spec_name: str, spec_path: Path, stats: TaskStats) -> None:
@@ -1581,7 +1590,10 @@ def run_three_phase_iteration(
 
     # Get current stats
     stats = read_task_stats(tasks_path)
-    progress_summary = f"{stats.done}/{stats.total} tasks complete ({stats.pending} pending, {stats.in_progress} in progress)"
+    progress_summary = (
+        f"{stats.done}/{stats.total} tasks complete "
+        f"({stats.pending} pending, {stats.in_progress} in progress)"
+    )
 
     # Use implementation prompt
     prompt = cfg.implementation_prompt.format(
@@ -1807,7 +1819,10 @@ def run_loop(
                 run_pre_session_validation(provider, cfg, project_path, spec_name, spec_path)
 
             # Build prompt with progress summary (no specific task assignment)
-            progress_summary = f"{stats.done}/{stats.total} tasks complete ({stats.pending} pending, {stats.in_progress} in progress)"
+            progress_summary = (
+                f"{stats.done}/{stats.total} tasks complete "
+                f"({stats.pending} pending, {stats.in_progress} in progress)"
+            )
             prompt = cfg.prompt_template.format(
                 spec_name=spec_name, progress_summary=progress_summary
             )

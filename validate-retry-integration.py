@@ -54,7 +54,7 @@ def validate_modules():
     safe_print("\n[OK] Validating Python modules...")
 
     try:
-        from spec_workflow_runner.retry_handler import (
+        from spec_workflow_runner.retry_handler import (  # noqa: F401
             RetryConfig,
             RetryContext,
             RetryHandler,
@@ -66,7 +66,7 @@ def validate_modules():
         return False
 
     try:
-        from spec_workflow_runner.subprocess_helpers import (
+        from spec_workflow_runner.subprocess_helpers import (  # noqa: F401
             monitor_process_with_timeout,
             safe_terminate_process,
         )
@@ -77,7 +77,7 @@ def validate_modules():
         return False
 
     try:
-        from spec_workflow_runner.utils import Config
+        from spec_workflow_runner.utils import Config  # noqa: F401
 
         safe_print("  [OK] utils.Config imports successfully")
     except ImportError as e:
@@ -85,7 +85,7 @@ def validate_modules():
         return False
 
     try:
-        from spec_workflow_runner.tui.models import RunnerState
+        from spec_workflow_runner.tui.models import RunnerState  # noqa: F401
 
         safe_print("  [OK] tui.models.RunnerState imports successfully")
     except ImportError as e:
