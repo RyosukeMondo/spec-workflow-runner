@@ -52,8 +52,7 @@ def project_with_changes(tmp_path: Path) -> Path:
 def tasks_md_in_progress(tmp_path: Path) -> Path:
     """Create tasks.md with in-progress tasks."""
     tasks_file = tmp_path / "tasks.md"
-    tasks_file.write_text(
-        """# Tasks
+    tasks_file.write_text("""# Tasks
 
 ## Tasks
 
@@ -71,8 +70,7 @@ def tasks_md_in_progress(tmp_path: Path) -> Path:
     - [ ] Tests written
 
 - [ ] 3. Pending task
-"""
-    )
+""")
     return tasks_file
 
 
@@ -192,15 +190,13 @@ def test_verify_in_progress_tasks_invalid(tasks_md_in_progress: Path, project_wi
 def test_update_verified_tasks(tmp_path: Path):
     """Test updating tasks.md with verified completions."""
     tasks_file = tmp_path / "tasks.md"
-    tasks_file.write_text(
-        """# Tasks
+    tasks_file.write_text("""# Tasks
 
 ## Tasks
 
 - [-] 1. Task to complete
 - [-] 2. Task to keep in progress
-"""
-    )
+""")
 
     from spec_workflow_runner.completion_verify import TaskVerification
 

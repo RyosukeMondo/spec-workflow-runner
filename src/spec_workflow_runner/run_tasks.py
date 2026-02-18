@@ -562,8 +562,7 @@ def _build_log_header(iteration: int, spec_name: str, command: list[str], prompt
     """Build the log file header with metadata."""
     started = datetime.now(UTC).isoformat()
     formatted_command = format_command_string(command)
-    return textwrap.dedent(
-        f"""\
+    return textwrap.dedent(f"""\
         # Iteration {iteration}
         # Started {started}
         # Spec {spec_name}
@@ -574,8 +573,7 @@ def _build_log_header(iteration: int, spec_name: str, command: list[str], prompt
         {prompt}
 
         # Output (stdout + stderr)
-        """
-    )
+        """)
 
 
 def _write_dry_run_log(log_path: Path, header: str, command: str) -> None:

@@ -39,8 +39,7 @@ def project_with_files(tmp_path: Path) -> Path:
 def tasks_md_with_completed(tmp_path: Path) -> Path:
     """Create tasks.md with completed tasks."""
     tasks_file = tmp_path / "tasks.md"
-    tasks_file.write_text(
-        """# Tasks
+    tasks_file.write_text("""# Tasks
 
 ## Tasks
 
@@ -55,8 +54,7 @@ def tasks_md_with_completed(tmp_path: Path) -> Path:
     - lib/repositories/user_repository.dart
 
 - [ ] 3. Pending task
-"""
-    )
+""")
     return tasks_file
 
 
@@ -137,16 +135,14 @@ def test_validate_completed_tasks_invalid(tasks_md_with_completed: Path, project
 def test_reset_invalid_tasks(tmp_path: Path):
     """Test resetting invalid tasks to in-progress."""
     tasks_file = tmp_path / "tasks.md"
-    tasks_file.write_text(
-        """# Tasks
+    tasks_file.write_text("""# Tasks
 
 ## Tasks
 
 - [x] 1. Task to reset
 - [x] 2. Another task to reset
 - [ ] 3. Pending task
-"""
-    )
+""")
 
     from spec_workflow_runner.validation_check import TaskValidation
 
@@ -175,8 +171,7 @@ def test_run_validation(tmp_path: Path, project_with_files: Path):
     spec_path.mkdir()
 
     tasks_file = spec_path / "tasks.md"
-    tasks_file.write_text(
-        """# Tasks
+    tasks_file.write_text("""# Tasks
 
 ## Tasks
 
@@ -185,8 +180,7 @@ def test_run_validation(tmp_path: Path, project_with_files: Path):
 
 - [x] 2. Invalid task
   - **Files**: lib/missing_file.dart
-"""
-    )
+""")
 
     result = run_validation(
         spec_name="test",

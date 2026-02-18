@@ -15,8 +15,7 @@ from spec_workflow_runner.progress_count import (
 def valid_tasks_md(tmp_path: Path) -> Path:
     """Create a valid tasks.md file."""
     tasks_file = tmp_path / "tasks.md"
-    tasks_file.write_text(
-        """# Tasks Document
+    tasks_file.write_text("""# Tasks Document
 
 ## Tasks
 
@@ -24,8 +23,7 @@ def valid_tasks_md(tmp_path: Path) -> Path:
 - [-] 2. Second task in progress
 - [x] 3. Completed task
 - [ ] 4.1 Subtask pending
-"""
-    )
+""")
     return tasks_file
 
 
@@ -33,8 +31,7 @@ def valid_tasks_md(tmp_path: Path) -> Path:
 def invalid_heading_tasks_md(tmp_path: Path) -> Path:
     """Create an invalid tasks.md with heading format."""
     tasks_file = tmp_path / "tasks.md"
-    tasks_file.write_text(
-        """# Tasks Document
+    tasks_file.write_text("""# Tasks Document
 
 ## Tasks
 
@@ -43,8 +40,7 @@ def invalid_heading_tasks_md(tmp_path: Path) -> Path:
 
 #### Task VF-1.2: Second task
 - **Status**: Completed
-"""
-    )
+""")
     return tasks_file
 
 
@@ -137,15 +133,13 @@ def test_validate_format_missing_tasks_section(tmp_path: Path) -> None:
 def test_count_tasks_with_whitespace_variations(tmp_path: Path) -> None:
     """Test counting tasks with various whitespace patterns."""
     tasks_file = tmp_path / "tasks.md"
-    tasks_file.write_text(
-        """## Tasks
+    tasks_file.write_text("""## Tasks
 
   - [ ] 1. Task with leading spaces
 -  [ ]  2. Task with extra spaces
    - [x]   3.   Task with lots of spaces
 - [-] 4. Normal task
-"""
-    )
+""")
 
     progress = count_tasks(tasks_file)
 
@@ -158,8 +152,7 @@ def test_count_tasks_with_whitespace_variations(tmp_path: Path) -> None:
 def test_count_tasks_stops_at_next_section(tmp_path: Path) -> None:
     """Test that counting stops at next ## section."""
     tasks_file = tmp_path / "tasks.md"
-    tasks_file.write_text(
-        """# Tasks Document
+    tasks_file.write_text("""# Tasks Document
 
 ## Tasks
 
@@ -170,8 +163,7 @@ def test_count_tasks_stops_at_next_section(tmp_path: Path) -> None:
 
 - [ ] This should not be counted
 - [ ] Neither should this
-"""
-    )
+""")
 
     progress = count_tasks(tasks_file)
 
