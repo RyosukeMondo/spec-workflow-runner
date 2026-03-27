@@ -39,11 +39,25 @@ def _make_config(
     )
 
 
-def test_build_prompt_uses_remaining_tasks() -> None:
+def test_build_prompt_uses_remaining_tasks(tmp_path: Path) -> None:
     cfg = _make_config("{spec_name}:{tasks_remaining}:{tasks_in_progress}")
     stats = TaskStats(done=1, pending=3, in_progress=1)
 
-    prompt = runner.build_prompt(cfg, "alpha", stats)
+    # Create a tasks.md file with a pending task for build_prompt to parse
+    spec_path = tmp_path / "spec"
+    spec_path.mkdir()
+    tasks_file = spec_path / "tasks.md"
+    tasks_file.write_text(
+        "## Tasks\n\n"
+        "- [x] 1. Completed task\n"
+        "- [ ] 2. Pending task A\n"
+        "- [ ] 3. Pending task B\n"
+        "- [ ] 4. Pending task C\n"
+        "- [-] 5. In progress task\n",
+        encoding="utf-8",
+    )
+
+    prompt = runner.build_prompt(cfg, "alpha", spec_path, stats)
 
     # total = 5, remaining = total - done = 4
     assert prompt == "alpha:4:1"
@@ -91,8 +105,8 @@ def test_run_provider_applies_config_overrides(tmp_path, monkeypatch) -> None:
             self.stdout = io.BytesIO(b"ok\n")
             self.returncode = 0
 
-        def wait(self) -> None:
-            return None
+        def wait(self, timeout: float | None = None) -> int:
+            return self.returncode
 
     def fake_popen(command, **kwargs):  # type: ignore[no-untyped-def]
         recorded["command"] = command
@@ -359,8 +373,8 @@ def test_run_provider_succeeds_on_first_attempt(tmp_path: Path, monkeypatch) -> 
             self.stdout = io.BytesIO(b"success\n")
             self.returncode = 0
 
-        def wait(self) -> None:
-            return None
+        def wait(self, timeout: float | None = None) -> int:
+            return self.returncode
 
     def fake_popen(command, **kwargs):  # type: ignore[no-untyped-def]
         return DummyProcess()
@@ -395,8 +409,8 @@ def test_run_provider_retries_on_failure(tmp_path: Path, monkeypatch) -> None:
             # Fail on first attempt, succeed on second
             self.returncode = 0 if attempt_count["count"] > 1 else 1
 
-        def wait(self) -> None:
-            return None
+        def wait(self, timeout: float | None = None) -> int:
+            return self.returncode
 
     def fake_popen(command, **kwargs):  # type: ignore[no-untyped-def]
         return DummyProcess()
@@ -436,8 +450,8 @@ def test_run_provider_exponential_backoff(tmp_path: Path, monkeypatch) -> None:
             # Succeed on third attempt
             self.returncode = 0 if attempt_count["count"] >= 3 else 1
 
-        def wait(self) -> None:
-            return None
+        def wait(self, timeout: float | None = None) -> int:
+            return self.returncode
 
     def fake_popen(command, **kwargs):  # type: ignore[no-untyped-def]
         return DummyProcess()
@@ -480,8 +494,8 @@ def test_run_provider_fails_after_max_retries(tmp_path: Path, monkeypatch) -> No
             self.stdout = io.BytesIO(b"error\n")
             self.returncode = 1  # Always fail
 
-        def wait(self) -> None:
-            return None
+        def wait(self, timeout: float | None = None) -> int:
+            return self.returncode
 
     def fake_popen(command, **kwargs):  # type: ignore[no-untyped-def]
         return DummyProcess()
@@ -527,8 +541,8 @@ def test_run_provider_logs_retry_attempts(tmp_path: Path, monkeypatch, caplog) -
             # Succeed on second attempt
             self.returncode = 0 if attempt_count["count"] > 1 else 1
 
-        def wait(self) -> None:
-            return None
+        def wait(self, timeout: float | None = None) -> int:
+            return self.returncode
 
     def fake_popen(command, **kwargs):  # type: ignore[no-untyped-def]
         return DummyProcess()
@@ -573,8 +587,8 @@ def test_run_provider_context_limit_error_uses_long_wait(tmp_path: Path, monkeyp
                 self.stdout = io.BytesIO(b"success\n")
                 self.returncode = 0
 
-        def wait(self) -> None:
-            return None
+        def wait(self, timeout: float | None = None) -> int:
+            return self.returncode
 
     def fake_popen(command, **kwargs):  # type: ignore[no-untyped-def]
         return DummyProcess()
@@ -627,8 +641,8 @@ def test_run_provider_context_limit_error_logs_wait_time(
                 self.stdout = io.BytesIO(b"success\n")
                 self.returncode = 0
 
-        def wait(self) -> None:
-            return None
+        def wait(self, timeout: float | None = None) -> int:
+            return self.returncode
 
     def fake_popen(command, **kwargs):  # type: ignore[no-untyped-def]
         return DummyProcess()
@@ -674,8 +688,8 @@ def test_run_provider_non_context_error_uses_exponential_backoff(
                 self.stdout = io.BytesIO(b"success\n")
                 self.returncode = 0
 
-        def wait(self) -> None:
-            return None
+        def wait(self, timeout: float | None = None) -> int:
+            return self.returncode
 
     def fake_popen(command, **kwargs):  # type: ignore[no-untyped-def]
         return DummyProcess()
@@ -726,8 +740,8 @@ def test_run_provider_infinite_retries_for_context_limit(tmp_path: Path, monkeyp
                 self.stdout = io.BytesIO(b"success\n")
                 self.returncode = 0
 
-        def wait(self) -> None:
-            return None
+        def wait(self, timeout: float | None = None) -> int:
+            return self.returncode
 
     def fake_popen(command, **kwargs):  # type: ignore[no-untyped-def]
         return DummyProcess()

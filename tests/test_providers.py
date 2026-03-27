@@ -71,7 +71,14 @@ def test_claude_provider_builds_basic_command() -> None:
     )
 
     assert cmd.executable == "claude"
-    assert cmd.args == ("--print", "--dangerously-skip-permissions", "test prompt")
+    assert cmd.args == (
+        "--print",
+        "--dangerously-skip-permissions",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "test prompt",
+    )
 
 
 def test_claude_provider_with_custom_executable() -> None:
@@ -95,7 +102,7 @@ def test_claude_provider_without_skip_permissions() -> None:
     )
 
     assert "--dangerously-skip-permissions" not in cmd.args
-    assert cmd.args == ("--print", "test")
+    assert cmd.args == ("--print", "--output-format", "stream-json", "--verbose", "test")
 
 
 def test_claude_provider_to_list() -> None:
@@ -181,6 +188,9 @@ def test_claude_provider_with_model() -> None:
         "--model",
         "sonnet",
         "--dangerously-skip-permissions",
+        "--output-format",
+        "stream-json",
+        "--verbose",
         "test prompt",
     )
 
@@ -194,7 +204,15 @@ def test_claude_provider_with_model_no_skip_permissions() -> None:
     )
 
     assert cmd.executable == "claude"
-    assert cmd.args == ("--print", "--model", "haiku", "test prompt")
+    assert cmd.args == (
+        "--print",
+        "--model",
+        "haiku",
+        "--output-format",
+        "stream-json",
+        "--verbose",
+        "test prompt",
+    )
 
 
 def test_create_provider_with_model() -> None:
